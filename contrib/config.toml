@@ -1,0 +1,18 @@
+ip = "0.0.0.0"
+port = 8000
+
+[[endpoints]]
+ip = "10.0.0.100"
+port = 443
+tls_insecure = true
+interval = 60
+username = "localadmin"
+password = "password"
+
+[[endpoints]]
+ip = "10.0.0.101"
+port = 443
+tls_insecure = true
+interval = 60
+username = "localadmin"
+password = "password"
