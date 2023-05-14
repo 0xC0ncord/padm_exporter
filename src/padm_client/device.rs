@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_json;
+use std::collections::HashMap;
 
 use crate::padm_client::variables::{is_metric, unpack_variable};
 
@@ -16,7 +16,7 @@ pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>, std::io::E
 
     for item in json["data"].as_array().unwrap() {
         'inner: for item in &item["attributes"].as_object() {
-            if ! is_metric(item) {
+            if !is_metric(item) {
                 continue;
             }
             for device in &mut devices {

@@ -16,8 +16,7 @@ struct Args {
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
 
-    let config = config::load_config_from_file(&args.config)
-        .unwrap();
+    let config = config::load_config_from_file(&args.config).unwrap();
 
     env_logger::init();
 

@@ -1,7 +1,10 @@
-use actix_web::{web::{self, Data}, App, HttpServer, HttpResponse};
+use actix_web::{
+    web::{self, Data},
+    App, HttpResponse, HttpServer,
+};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 use tokio::runtime::Runtime;
 
 use crate::config;
@@ -24,9 +27,7 @@ pub async fn run(config: config::Config) -> std::io::Result<()> {
     // Spawn probe thread
     thread::spawn(move || {
         let rt = Runtime::new().unwrap();
-        rt.block_on(async move {
-            server::probe::run(config, body_mutex_clone).await
-        });
+        rt.block_on(async move { server::probe::run(config, body_mutex_clone).await });
         loop {
             thread::park();
         }
@@ -37,8 +38,8 @@ pub async fn run(config: config::Config) -> std::io::Result<()> {
         App::new()
             .app_data(Data::new(body_mutex.clone()))
             .route("/padm", web::get().to(index))
-        })
-        .bind(bind_address)?
-        .run()
-        .await
+    })
+    .bind(bind_address)?
+    .run()
+    .await
 }

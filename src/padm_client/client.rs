@@ -18,9 +18,7 @@ impl AuthData {
         }
     }
     pub fn is_empty(&self) -> bool {
-        self.access_token.is_empty() ||
-            self.refresh_token.is_empty() ||
-            self.msg.is_empty()
+        self.access_token.is_empty() || self.refresh_token.is_empty() || self.msg.is_empty()
     }
 }
 
@@ -37,7 +35,14 @@ pub struct PADMClient {
     auth_data: Arc<Mutex<AuthData>>,
 }
 impl PADMClient {
-    pub fn new(host: &str, scheme: &str, tls_insecure: bool, interval: u64, username: &str, password: &str) -> PADMClient {
+    pub fn new(
+        host: &str,
+        scheme: &str,
+        tls_insecure: bool,
+        interval: u64,
+        username: &str,
+        password: &str,
+    ) -> PADMClient {
         let mut client_builder = reqwest::Client::builder();
         // Disable SSL verification if asked
         if tls_insecure {
@@ -65,7 +70,9 @@ impl PADMClient {
         let request_url = format!("https://{}/api/oauth/token?grant_type=password", self.host);
         let params = [("username", &self.username), ("password", &self.password)];
 
-        let auth_data: AuthData = self.client.post(&request_url)
+        let auth_data: AuthData = self
+            .client
+            .post(&request_url)
             .form(&params)
             .send()
             .await?
@@ -76,8 +83,12 @@ impl PADMClient {
         Ok(())
     }
     async fn raw_get(&self, url: &str) -> Result<reqwest::Response, reqwest::Error> {
-        self.client.get(url)
-            .header(reqwest::header::AUTHORIZATION, format!("Bearer {}", &self.auth_data.lock().unwrap().access_token))
+        self.client
+            .get(url)
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {}", &self.auth_data.lock().unwrap().access_token),
+            )
             .send()
             .await
     }

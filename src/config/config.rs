@@ -43,7 +43,7 @@ impl Endpoint {
     pub fn scheme(&self) -> &str {
         match &self.scheme {
             Some(s) => s,
-            None => "https"
+            None => "https",
         }
     }
     pub fn tls_insecure(&self) -> bool {
@@ -65,7 +65,7 @@ impl Endpoint {
 }
 
 pub fn load_config_from_file(file_path: &str) -> Result<Config, std::io::Error> {
-    let config: Config = toml::from_str(&fs::read_to_string(file_path)?)
-        .expect("Failed parsing toml config");
+    let config: Config =
+        toml::from_str(&fs::read_to_string(file_path)?).expect("Failed parsing toml config");
     Ok(config)
 }
