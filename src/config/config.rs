@@ -33,7 +33,7 @@ pub struct Endpoint {
     port: Option<u16>,
     scheme: Option<String>,
     tls_insecure: Option<bool>,
-    interval: Option<u32>,
+    interval: Option<u64>,
     username: String,
     password: String,
 }
@@ -59,7 +59,7 @@ impl Endpoint {
             None => false,
         };
     }
-    pub fn interval(&self) -> u32 {
+    pub fn interval(&self) -> u64 {
         return match self.interval {
             Some(i) => i,
             None => 30,
