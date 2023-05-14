@@ -90,19 +90,24 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
 
         let arc = Arc::new(Mutex::new(Vec::new()));
         let arc_clone = arc.clone();
+        let current = thread::current();
 
         thread::spawn(move || {
             let rt = Runtime::new().unwrap();
             rt.block_on(async move {
-                client_run(client, arc_clone).await
+                client_run(client, arc_clone, current).await
             });
-            loop {}
+            loop {
+                thread::park();
+            }
         });
 
         device_arcs.push(arc);
     }
 
     loop {
+        thread::park();
+
         let mut all_devices = Vec::new();
         for arc in &device_arcs {
             all_devices.append(&mut arc
@@ -113,19 +118,20 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
         }
         let output = format_output_from_devices(&all_devices);
         *body.lock().unwrap() = output;
-        async_std::task::sleep(Duration::from_millis(1000)).await;
     }
 }
 
 async fn client_run(
     client: padm_client::client::PADMClient,
-    devices_arc: Arc<Mutex<Vec<padm_client::device::Device>>>
+    devices_arc: Arc<Mutex<Vec<padm_client::device::Device>>>,
+    main_thread: std::thread::Thread,
 ) {
     loop {
         let devices = get_devices_from(&client)
             .await
             .expect("Failed getting devices from client!");
         *devices_arc.lock().unwrap() = devices;
+        main_thread.unpark();
         async_std::task::sleep(Duration::from_millis(client.interval() * 1000)).await;
     }
 }

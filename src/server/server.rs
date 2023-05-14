@@ -27,7 +27,9 @@ pub async fn run(config: config::Config) -> std::io::Result<()> {
         rt.block_on(async move {
             server::probe::run(config, body_mutex_clone).await
         });
-        loop {}
+        loop {
+            thread::park();
+        }
     });
 
     // Startup
