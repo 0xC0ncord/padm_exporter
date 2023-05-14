@@ -40,7 +40,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             ("help", "Critically high temperature"),
         ])),
     ]);
-    return Mutex::new(map);
+    Mutex::new(map)
 });
 
 pub fn unpack_variable(data: &Map<String, serde_json::Value>) -> HashMap<String, String> {
@@ -48,23 +48,23 @@ pub fn unpack_variable(data: &Map<String, serde_json::Value>) -> HashMap<String,
     let map = PADM_VARIABLE_MAP.lock().unwrap();
 
     let extract = |field: &str| -> String {
-        return map.get(&data["label"].as_str().unwrap())
+        map.get(&data["label"].as_str().unwrap())
             .unwrap()
             .get(field)
-            .expect(format!("field '{}' not found in variable data!", field).as_str())
-            .to_string();
+            .unwrap_or_else(|| panic!("Field '{}' not found in variable data!", field))
+            .to_string()
     };
 
     m.insert(String::from("name"), extract("name"));
     m.insert(String::from("type"), extract("type"));
     m.insert(String::from("help"), extract("help"));
     m.insert(String::from("value"), data["value"].as_str().unwrap().to_string());
-    return m;
+    m
 }
 
 pub fn is_metric(data: &Map<String, serde_json::Value>) -> bool {
     let map = PADM_VARIABLE_MAP.lock().unwrap();
-    return match map.get(&data["label"].as_str().unwrap()) {
+    match map.get(&data["label"].as_str().unwrap()) {
         Some(..) => true,
         None => false,
     }

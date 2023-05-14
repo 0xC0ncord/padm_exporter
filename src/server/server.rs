@@ -9,10 +9,10 @@ use crate::server;
 
 async fn index(body_mutex: Data<Arc<Mutex<String>>>) -> HttpResponse {
     // Wait until we have data
-    if *body_mutex.lock().unwrap() == "" {
+    if (*body_mutex.lock().unwrap()).is_empty() {
         async_std::task::sleep(Duration::from_millis(1000)).await;
     }
-    HttpResponse::Ok().body(format!("{}", *body_mutex.lock().unwrap()))
+    HttpResponse::Ok().body((*body_mutex.lock().unwrap()).to_string())
 }
 
 pub async fn run(config: config::Config) -> std::io::Result<()> {

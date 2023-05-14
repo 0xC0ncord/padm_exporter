@@ -16,12 +16,12 @@ pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>, std::io::E
 
     for item in json["data"].as_array().unwrap() {
         'inner: for item in &item["attributes"].as_object() {
-            if ! is_metric(&item) {
+            if ! is_metric(item) {
                 continue;
             }
             for device in &mut devices {
                 if device.id == item["device_id"].as_i64().unwrap() {
-                    let variable = unpack_variable(&item);
+                    let variable = unpack_variable(item);
                     device.variables.push(variable);
                     break 'inner;
                 }
@@ -44,5 +44,5 @@ pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>, std::io::E
         }
     }
 
-    return Ok(devices);
+    Ok(devices)
 }

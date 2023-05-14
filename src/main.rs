@@ -3,7 +3,6 @@ mod padm_client;
 mod server;
 
 use clap::Parser;
-use env_logger;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]

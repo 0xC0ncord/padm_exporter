@@ -11,16 +11,16 @@ pub struct AuthData {
 }
 impl AuthData {
     pub fn new() -> AuthData {
-        return AuthData {
+        AuthData {
             access_token: String::new(),
             refresh_token: String::new(),
             msg: String::new(),
-        };
+        }
     }
     pub fn is_empty(&self) -> bool {
-        return self.access_token == "" ||
-            self.refresh_token == "" ||
-            self.msg == "";
+        self.access_token.is_empty() ||
+            self.refresh_token.is_empty() ||
+            self.msg.is_empty()
     }
 }
 
@@ -47,7 +47,7 @@ impl PADMClient {
         // Get a new reqwest client
         let client = client_builder.build().unwrap();
 
-        return PADMClient {
+        PADMClient {
             client,
             host: String::from(host),
             scheme: String::from(scheme),
@@ -58,7 +58,7 @@ impl PADMClient {
         }
     }
     pub fn interval(&self) -> u64 {
-        return self.interval;
+        self.interval
     }
     /// Log into the device and retrieve authentication data
     async fn authenticate(&self) -> anyhow::Result<()> {
@@ -91,7 +91,7 @@ impl PADMClient {
         }
 
         let response = self.raw_get(&url).await;
-        return match response {
+        match response {
             Ok(r) => Ok(r),
             Err(e) => {
                 if let Some(code) = e.status() {
@@ -102,7 +102,7 @@ impl PADMClient {
                     }
                 }
                 // Otherwise just return the error
-                return Err(anyhow::Error::new(e));
+                Err(anyhow::Error::new(e))
             }
         }
     }

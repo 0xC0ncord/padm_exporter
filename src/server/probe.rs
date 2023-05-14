@@ -18,12 +18,12 @@ struct Variable {
 }
 impl Variable {
     pub fn new(name: String, var_type: String, help: String) -> Variable {
-        return Variable {
+        Variable {
             name,
             var_type,
             help,
             device_values: HashMap::new(),
-        };
+        }
     }
 }
 
@@ -71,7 +71,7 @@ fn format_output_from_devices(devices: &Vec<padm_client::device::Device>) -> Str
             body.push_str(format!("{}{{device=\"{}\"}} {}\n", var.name, device, value).as_str());
         }
     }
-    return body;
+    body
 }
 
 pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {

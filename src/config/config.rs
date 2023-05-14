@@ -1,6 +1,5 @@
 use serde::Deserialize;
 use std::fs;
-use toml;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -10,20 +9,17 @@ pub struct Config {
 }
 impl Config {
     pub fn ip(&self) -> &str {
-        return self.ip.as_str();
+        self.ip.as_str()
     }
     pub fn port(&self) -> u16 {
-        return match self.port {
-            Some(p) => p,
-            None => 8000,
-        };
+        self.port.unwrap_or(8000)
     }
     pub fn endpoints(&self) -> &Vec<Endpoint> {
-        return &self.endpoints;
+        &self.endpoints
     }
 
     pub fn bind_address(&self) -> String {
-        return format!("{}:{}", self.ip(), self.port());
+        format!("{}:{}", self.ip(), self.port())
     }
 }
 
@@ -39,41 +35,32 @@ pub struct Endpoint {
 }
 impl Endpoint {
     pub fn ip(&self) -> &str {
-        return &self.ip.as_str();
+        self.ip.as_str()
     }
     pub fn port(&self) -> u16 {
-        return match self.port {
-            Some(p) => p,
-            None => 443,
-        };
+        self.port.unwrap_or(443)
     }
     pub fn scheme(&self) -> &str {
-        return match &self.scheme {
-            Some(s) => &s,
-            None => &"https",
-        };
+        match &self.scheme {
+            Some(s) => s,
+            None => "https"
+        }
     }
     pub fn tls_insecure(&self) -> bool {
-        return match self.tls_insecure {
-            Some(b) => b,
-            None => false,
-        };
+        self.tls_insecure.unwrap_or(false)
     }
     pub fn interval(&self) -> u64 {
-        return match self.interval {
-            Some(i) => i,
-            None => 30,
-        };
+        self.interval.unwrap_or(30)
     }
     pub fn username(&self) -> &str {
-        return &self.username;
+        &self.username
     }
     pub fn password(&self) -> &str {
-        return &self.password;
+        &self.password
     }
 
     pub fn host(&self) -> String {
-        return format!("{}:{}", self.ip(), self.port());
+        format!("{}:{}", self.ip(), self.port())
     }
 }
 
