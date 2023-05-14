@@ -1,10 +1,12 @@
 use anyhow;
 use reqwest;
-use serde_json::{from_str, Value};
+use serde::Deserialize;
+use std::sync::{Arc, Mutex};
 
+#[derive(Deserialize)]
 pub struct AuthData {
     pub access_token: String,
-    pub refresh_token: String, //unused
+    pub refresh_token: String,
     pub msg: String,
 }
 impl AuthData {
@@ -27,17 +29,15 @@ impl AuthData {
 */
 pub struct PADMClient {
     client: reqwest::Client,
-    pub host: String,
-    pub scheme: String,
+    host: String,
+    scheme: String,
+    interval: u64,
     username: String,
     password: String,
-    auth_data: AuthData,
+    auth_data: Arc<Mutex<AuthData>>,
 }
 impl PADMClient {
-    /*
-    * Create a new PADMClient
-    */
-    pub async fn new(host: &str, scheme: &str, tls_insecure: bool, username: &str, password: &str) -> PADMClient {
+    pub fn new(host: &str, scheme: &str, tls_insecure: bool, interval: u64, username: &str, password: &str) -> PADMClient {
         let mut client_builder = reqwest::Client::builder();
         // Disable SSL verification if asked
         if tls_insecure {
@@ -53,55 +53,40 @@ impl PADMClient {
             scheme: String::from(scheme),
             username: username.to_string(),
             password: password.to_string(),
-            auth_data: AuthData::new(),
+            interval,
+            auth_data: Arc::new(Mutex::new(AuthData::new())),
         }
     }
-
-    /*
-    * Log into the device and retrieve authentication data
-    */
-    async fn authenticate(&mut self) -> anyhow::Result<()> {
+    pub fn interval(&self) -> u64 {
+        return self.interval;
+    }
+    /// Log into the device and retrieve authentication data
+    async fn authenticate(&self) -> anyhow::Result<()> {
         let request_url = format!("https://{}/api/oauth/token?grant_type=password", self.host);
         let params = [("username", &self.username), ("password", &self.password)];
 
-        let response = self.client.post(&request_url)
+        let auth_data: AuthData = self.client.post(&request_url)
             .form(&params)
             .send()
             .await?
-            .text()
+            .json()
             .await?;
 
-        let json_response: Value = from_str(&response)?;
-
-        fn extract(json: &Value, field: &str) -> String {
-            return json[field].to_string()
-                .trim_matches('"')
-                .to_string();
-        }
-
-        self.auth_data = AuthData {
-            access_token: extract(&json_response, "access_token"),
-            refresh_token: extract(&json_response, "refresh_token"),
-            msg: extract(&json_response, "msg"),
-        };
+        *self.auth_data.lock().unwrap() = auth_data;
         Ok(())
     }
-
     async fn raw_get(&self, url: &str) -> Result<reqwest::Response, reqwest::Error> {
         self.client.get(url)
-            .header(reqwest::header::AUTHORIZATION, format!("Bearer {}", &self.auth_data.access_token))
+            .header(reqwest::header::AUTHORIZATION, format!("Bearer {}", &self.auth_data.lock().unwrap().access_token))
             .send()
             .await
     }
-
-    /*
-    * Do an authenticated GET request
-    */
-    pub async fn do_get(&mut self, path: &str) -> anyhow::Result<reqwest::Response> {
+    /// Do an authenticated GET request
+    pub async fn do_get(&self, path: &str) -> anyhow::Result<reqwest::Response> {
         let url = format!("{}://{}{}", self.scheme, self.host, path);
 
         // Authenticate if never authenticated before
-        if self.auth_data.is_empty() {
+        if self.auth_data.lock().unwrap().is_empty() {
             self.authenticate().await?;
         }
 

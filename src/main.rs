@@ -1,8 +1,9 @@
-pub mod config;
-pub mod padm_client;
-pub mod server;
+mod config;
+mod padm_client;
+mod server;
 
 use clap::Parser;
+use env_logger;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -16,8 +17,10 @@ struct Args {
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
 
-    let config = config::config::load_config_from_file(&args.config)
+    let config = config::load_config_from_file(&args.config)
         .unwrap();
 
-    server::server::run(&config).await
+    env_logger::init();
+
+    server::run(config).await
 }

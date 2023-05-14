@@ -1,13 +1,15 @@
-use actix_web::web::Data;
+use anyhow;
 use serde_json::{from_str, Value};
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
 use crate::config;
 use crate::padm_client;
 
+#[derive(Debug, Clone)]
 struct Variable {
     name: String,
     var_type: String,
@@ -25,20 +27,16 @@ impl Variable {
     }
 }
 
-async fn get_devices_from(clients: &mut Vec<padm_client::client::PADMClient>) -> Vec<padm_client::device::Device> {
-    let mut devices: Vec<padm_client::device::Device> = Vec::new();
-    for client in clients {
-        let json: Value = from_str(client.do_get("/api/variables")
-            .await
-            .unwrap()
-            .text()
-            .await
-            .unwrap()
-            .as_str()
-        ).unwrap();
-        devices.append(&mut padm_client::device::load_all_from(&json).unwrap());
-    }
-    return devices;
+async fn get_devices_from(
+    client: &padm_client::client::PADMClient
+) -> anyhow::Result<Vec<padm_client::device::Device>, anyhow::Error> {
+    let json: Value = from_str(client.do_get("/api/variables")
+        .await?
+        .text()
+        .await?
+        .as_str()
+    )?;
+    Ok(padm_client::device::load_all_from(&json).unwrap())
 }
 
 fn format_output_from_devices(devices: &Vec<padm_client::device::Device>) -> String {
@@ -76,30 +74,58 @@ fn format_output_from_devices(devices: &Vec<padm_client::device::Device>) -> Str
     return body;
 }
 
-pub fn run(config: &config::config::Config, body_mutex: Data<Mutex<String>>) {
-    let rt = Runtime::new().unwrap();
-    rt.block_on(async move {
-        run_async(&config, body_mutex).await
-    });
-    loop {}
-}
+pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
+    let mut device_arcs = Vec::new();
 
-pub async fn run_async(config: &config::Config, body_mutex: Data<Mutex<String>>) {
-    let mut clients: Vec<padm_client::client::PADMClient> = Vec::new();
+    // Spawn client threads
     for endpoint in config.endpoints() {
-        clients.push(padm_client::client::PADMClient::new(
+        let client = padm_client::client::PADMClient::new(
             endpoint.host().as_str(),
             endpoint.scheme(),
             endpoint.tls_insecure(),
+            endpoint.interval(),
             endpoint.username(),
             endpoint.password()
-        ).await);
+        );
+
+        let arc = Arc::new(Mutex::new(Vec::new()));
+        let arc_clone = arc.clone();
+
+        thread::spawn(move || {
+            let rt = Runtime::new().unwrap();
+            rt.block_on(async move {
+                client_run(client, arc_clone).await
+            });
+            loop {}
+        });
+
+        device_arcs.push(arc);
     }
 
     loop {
-        let devices = get_devices_from(&mut clients).await;
-        let output = format_output_from_devices(&devices);
-        *body_mutex.lock().unwrap() = output;
-        async_std::task::sleep(Duration::from_millis(100 * 30)).await;
+        let mut all_devices = Vec::new();
+        for arc in &device_arcs {
+            all_devices.append(&mut arc
+                .lock()
+                .unwrap()
+                .to_owned()
+            );
+        }
+        let output = format_output_from_devices(&all_devices);
+        *body.lock().unwrap() = output;
+        async_std::task::sleep(Duration::from_millis(1000)).await;
+    }
+}
+
+async fn client_run(
+    client: padm_client::client::PADMClient,
+    devices_arc: Arc<Mutex<Vec<padm_client::device::Device>>>
+) {
+    loop {
+        let devices = get_devices_from(&client)
+            .await
+            .expect("Failed getting devices from client!");
+        *devices_arc.lock().unwrap() = devices;
+        async_std::task::sleep(Duration::from_millis(client.interval() * 1000)).await;
     }
 }

@@ -3,6 +3,7 @@ use serde_json;
 
 use crate::padm_client::variables::{is_metric, unpack_variable};
 
+#[derive(Debug, Clone)]
 pub struct Device {
     pub id: i64,
     pub name: String,
