@@ -14,7 +14,7 @@ async fn index(body_mutex: Data<Mutex<String>>) -> HttpResponse {
     HttpResponse::Ok().body(format!("{}", *body_mutex.lock().unwrap()))
 }
 
-pub async fn run(config: &config::config::Config) -> std::io::Result<()> {
+pub async fn run(config: &config::Config) -> std::io::Result<()> {
     // Create global body reference
     let body_mutex = Data::new(Mutex::new(String::from("")));
     let body_mutex_copy = body_mutex.clone();

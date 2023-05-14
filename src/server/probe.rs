@@ -84,7 +84,7 @@ pub fn run(config: &config::config::Config, body_mutex: Data<Mutex<String>>) {
     loop {}
 }
 
-pub async fn run_async(config: &config::config::Config, body_mutex: Data<Mutex<String>>) {
+pub async fn run_async(config: &config::Config, body_mutex: Data<Mutex<String>>) {
     let mut clients: Vec<padm_client::client::PADMClient> = Vec::new();
     for endpoint in config.endpoints() {
         clients.push(padm_client::client::PADMClient::new(
