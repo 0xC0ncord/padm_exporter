@@ -121,7 +121,7 @@ impl PADMClient {
             Ok(r) => Ok(r),
             Err(err) => {
                 match err.status() {
-                    Some(reqwest::StatusCode::FORBIDDEN) => {
+                    Some(reqwest::StatusCode::UNAUTHORIZED) => {
                         // Authenticate again if needed
                         self.authenticate().await?;
                         Ok(self.raw_get(&url).await?)
