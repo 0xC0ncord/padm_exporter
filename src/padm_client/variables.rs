@@ -10,7 +10,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "firmware_version"),
                 ("type", "gauge"),
-                ("help", "Device firmware version"),
+                ("help", "Device firmware version."),
             ]),
         ),
         (
@@ -18,7 +18,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "operating_mode"),
                 ("type", "gauge"),
-                ("help", "Device operating mode"),
+                ("help", "Device operating mode."),
             ]),
         ),
         (
@@ -26,7 +26,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "lcd_display_units"),
                 ("type", "gauge"),
-                ("help", "Units displayed on the LCD screen"),
+                ("help", "Units displayed on the LCD screen."),
             ]),
         ),
         (
@@ -34,7 +34,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "dehumidifying_mode"),
                 ("type", "gauge"),
-                ("help", "Device dehumidifying mode"),
+                ("help", "Device dehumidifying mode."),
             ]),
         ),
         (
@@ -42,7 +42,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "water_fault"),
                 ("type", "gauge"),
-                ("help", "Device water fault status"),
+                ("help", "Device water fault status."),
             ]),
         ),
         (
@@ -50,7 +50,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "automatic_fan_speed_state"),
                 ("type", "gauge"),
-                ("help", "Device automatic fan speed status"),
+                ("help", "Device automatic fan speed status."),
             ]),
         ),
         (
@@ -58,7 +58,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "fan_speed"),
                 ("type", "gauge"),
-                ("help", "Device fan speed setting"),
+                ("help", "Device fan speed setting."),
             ]),
         ),
         (
@@ -66,7 +66,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "fan_always_on"),
                 ("type", "gauge"),
-                ("help", "Device fan always on setting"),
+                ("help", "Device fan always on setting."),
             ]),
         ),
         (
@@ -74,7 +74,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "quiet_mode"),
                 ("type", "gauge"),
-                ("help", "Device quiet mode setting"),
+                ("help", "Device quiet mode setting."),
             ]),
         ),
         (
@@ -82,7 +82,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "set_point_temperature"),
                 ("type", "gauge"),
-                ("help", "Set point temperature in celsius"),
+                ("help", "Set point temperature in celsius."),
             ]),
         ),
         (
@@ -90,7 +90,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "remote_temperature_sensor_state"),
                 ("type", "gauge"),
-                ("help", "Remote temperature sensor state"),
+                ("help", "Remote temperature sensor state."),
             ]),
         ),
         (
@@ -98,7 +98,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "return_air_temperature"),
                 ("type", "gauge"),
-                ("help", "Temperature of the return air in celsius"),
+                ("help", "Temperature of the return air in celsius."),
             ]),
         ),
         (
@@ -106,7 +106,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "remote_set_point_temperature"),
                 ("type", "gauge"),
-                ("help", "Set point temperature of the remote sensor"),
+                ("help", "Set point temperature of the remote sensor."),
             ]),
         ),
         (
@@ -114,7 +114,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "temperature"),
                 ("type", "gauge"),
-                ("help", "Current detected temperature"),
+                ("help", "Current detected temperature."),
             ]),
         ),
         (
@@ -122,7 +122,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "temperature_supported"),
                 ("type", "gauge"),
-                ("help", "Whether the device supports temperature sensing"),
+                ("help", "Whether the device supports temperature sensing."),
             ]),
         ),
         (
@@ -130,7 +130,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "humidity_supported"),
                 ("type", "gauge"),
-                ("help", "Whether the device supports humidity sensing"),
+                ("help", "Whether the device supports humidity sensing."),
             ]),
         ),
         (
@@ -138,7 +138,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "contact_input_count"),
                 ("type", "counter"),
-                ("help", "GPIO input contact counter"),
+                ("help", "GPIO input contact counter."),
             ]),
         ),
         (
@@ -146,7 +146,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "contact_output_count"),
                 ("type", "counter"),
-                ("help", "GPIO output contact counter"),
+                ("help", "GPIO output contact counter."),
             ]),
         ),
         (
@@ -154,7 +154,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "temp_low_crit_threshold"),
                 ("type", "gauge"),
-                ("help", "Critically low temperature"),
+                ("help", "Critically low temperature."),
             ]),
         ),
         (
@@ -162,7 +162,7 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             HashMap::from([
                 ("name", "temp_high_crit_threshold"),
                 ("type", "gauge"),
-                ("help", "Critically high temperature"),
+                ("help", "Critically high temperature."),
             ]),
         ),
     ]);
