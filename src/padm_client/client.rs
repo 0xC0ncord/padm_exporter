@@ -1,5 +1,4 @@
-use anyhow;
-use reqwest;
+use log::error;
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 
@@ -54,8 +53,8 @@ impl PADMClient {
 
         PADMClient {
             client,
-            host: String::from(host),
-            scheme: String::from(scheme),
+            host: host.to_string(),
+            scheme: scheme.to_string(),
             username: username.to_string(),
             password: password.to_string(),
             interval,
@@ -65,22 +64,38 @@ impl PADMClient {
     pub fn interval(&self) -> u64 {
         self.interval
     }
+    pub fn host(&self) -> &str {
+        &self.host
+    }
     /// Log into the device and retrieve authentication data
-    async fn authenticate(&self) -> anyhow::Result<()> {
+    async fn authenticate(&self) -> Result<(), reqwest::Error> {
         let request_url = format!("https://{}/api/oauth/token?grant_type=password", self.host);
         let params = [("username", &self.username), ("password", &self.password)];
 
-        let auth_data: AuthData = self
-            .client
+        let response = self.client
             .post(&request_url)
             .form(&params)
             .send()
-            .await?
-            .json()
-            .await?;
+            .await;
 
-        *self.auth_data.lock().unwrap() = auth_data;
-        Ok(())
+        match response {
+            Err(e) => {
+                error!("Authentication failed on endpoint {}: {}", self.host(), e);
+                Err(e)
+            },
+            Ok(r) => {
+                match r.json().await {
+                    Err(e) => {
+                        error!("Malformed auth response from endpoint {}: {}", self.host(), e);
+                        Err(e)
+                    },
+                    Ok(j) => {
+                        *self.auth_data.lock().unwrap() = j;
+                        Ok(())
+                    }
+                }
+            }
+        }
     }
     async fn raw_get(&self, url: &str) -> Result<reqwest::Response, reqwest::Error> {
         self.client
@@ -93,7 +108,7 @@ impl PADMClient {
             .await
     }
     /// Do an authenticated GET request
-    pub async fn do_get(&self, path: &str) -> anyhow::Result<reqwest::Response> {
+    pub async fn do_get(&self, path: &str) -> Result<reqwest::Response, reqwest::Error> {
         let url = format!("{}://{}{}", self.scheme, self.host, path);
 
         // Authenticate if never authenticated before
@@ -104,16 +119,16 @@ impl PADMClient {
         let response = self.raw_get(&url).await;
         match response {
             Ok(r) => Ok(r),
-            Err(e) => {
-                if let Some(code) = e.status() {
-                    // Authenticate again if needed
-                    if code == reqwest::StatusCode::FORBIDDEN {
+            Err(err) => {
+                match err.status() {
+                    Some(reqwest::StatusCode::FORBIDDEN) => {
+                        // Authenticate again if needed
                         self.authenticate().await?;
-                        return Ok(self.raw_get(&url).await?);
-                    }
+                        Ok(self.raw_get(&url).await?)
+                    },
+                    // Otherwise just return the error
+                    _ => Err(err)
                 }
-                // Otherwise just return the error
-                Err(anyhow::Error::new(e))
             }
         }
     }

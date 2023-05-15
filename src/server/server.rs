@@ -1,7 +1,8 @@
 use actix_web::{
     web::{self, Data},
-    App, HttpResponse, HttpServer,
+    App, HttpResponse, HttpRequest, HttpServer,
 };
+use log::debug;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -10,7 +11,12 @@ use tokio::runtime::Runtime;
 use crate::config;
 use crate::server;
 
-async fn index(body_mutex: Data<Arc<Mutex<String>>>) -> HttpResponse {
+async fn index(request: HttpRequest, body_mutex: Data<Arc<Mutex<String>>>) -> HttpResponse {
+    let peer_addr = request.peer_addr();
+    match peer_addr {
+        Some(addr) => debug!("Connection opened from {}", addr),
+        None => debug!("Connection opened from unknown"),
+    }
     // Wait until we have data
     if (*body_mutex.lock().unwrap()).is_empty() {
         async_std::task::sleep(Duration::from_millis(1000)).await;

@@ -18,7 +18,10 @@ async fn main() -> std::io::Result<()> {
 
     let config = config::load_config_from_file(&args.config).unwrap();
 
-    env_logger::init();
+    let env = env_logger::Env::default()
+        .filter_or("MY_LOG_LEVEL", config.log_level())
+        .write_style_or("MY_LOG_LEVEL", config.log_level());
+    env_logger::init_from_env(env);
 
     server::run(config).await
 }

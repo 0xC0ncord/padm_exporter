@@ -1247,6 +1247,7 @@ dependencies = [
  "async-std",
  "clap",
  "env_logger",
+ "log",
  "once_cell",
  "reqwest",
  "serde",

@@ -5,6 +5,7 @@ use std::fs;
 pub struct Config {
     ip: String,
     port: Option<u16>,
+    log_level: Option<String>,
     endpoints: Vec<Endpoint>,
 }
 impl Config {
@@ -13,6 +14,12 @@ impl Config {
     }
     pub fn port(&self) -> u16 {
         self.port.unwrap_or(8000)
+    }
+    pub fn log_level(&self) -> &str {
+        match &self.log_level {
+            Some(s) => s,
+            None => "info"
+        }
     }
     pub fn endpoints(&self) -> &Vec<Endpoint> {
         &self.endpoints

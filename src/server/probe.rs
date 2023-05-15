@@ -1,5 +1,4 @@
-use anyhow;
-use serde_json::{from_str, Value};
+use log::error;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -7,73 +6,109 @@ use std::time::Duration;
 use tokio::runtime::Runtime;
 
 use crate::config;
-use crate::padm_client;
+use crate::padm_client::{client::PADMClient, device::{Device, load_all_from}};
 
 #[derive(Debug, Clone)]
-struct Variable {
+struct Metric {
     name: String,
-    var_type: String,
+    mtype: String,
     help: String,
-    device_values: HashMap<String, String>,
+    metrics: Vec<DeviceMetric>,
 }
-impl Variable {
-    pub fn new(name: String, var_type: String, help: String) -> Variable {
-        Variable {
-            name,
-            var_type,
-            help,
-            device_values: HashMap::new(),
+
+#[derive(Debug, Clone)]
+struct DeviceMetric {
+    device: String,
+    value: String,
+    labels: HashMap<String, String>,
+}
+
+async fn get_devices_from(
+    client: &PADMClient,
+) -> Result<Vec<Device>, anyhow::Error> {
+    let response = client.do_get("/api/variables").await;
+    match response {
+        Err(e) => Err(e.into()),
+        Ok(r) => {
+            match r.error_for_status() {
+                Err(e) => Err(e.into()),
+                Ok(r) => {
+                    match r.text().await {
+                        Err(e) => Err(e.into()),
+                        Ok(s) => {
+                            let json = serde_json::from_str(&s);
+                            let devices = load_all_from(&json?);
+                            match devices {
+                                Ok(v) => Ok(v),
+                                Err(e) => Err(e.into()),
+                            }
+                        }
+                    }
+                },
+            }
         }
     }
 }
 
-async fn get_devices_from(
-    client: &padm_client::client::PADMClient,
-) -> anyhow::Result<Vec<padm_client::device::Device>, anyhow::Error> {
-    let json: Value = from_str(
-        client
-            .do_get("/api/variables")
-            .await?
-            .text()
-            .await?
-            .as_str(),
-    )?;
-    Ok(padm_client::device::load_all_from(&json).unwrap())
-}
-
-fn format_output_from_devices(devices: &Vec<padm_client::device::Device>) -> String {
+fn format_output_from_devices(
+    devices: &Vec<Device>
+) -> Result<String, std::io::Error> {
     let mut body: String = String::new();
-    let mut variables: Vec<Variable> = Vec::new();
+    let mut all_metrics: Vec<Metric> = Vec::new();
 
     for device in devices {
-        for var in &device.variables {
-            let label = var.get("name").unwrap().to_string();
-            let value = var.get("value").unwrap().to_string();
+        for variable in &device.variables {
+            let name = variable.get("name").to_string();
+            let value = variable.get("value").to_string();
 
-            if let Some(var) = variables.iter_mut().find(|x| x.name == label) {
-                var.device_values.insert(device.name.to_owned(), value);
+            if let Some(metric) = all_metrics.iter_mut().find(|x| x.name == name) {
+                metric.metrics.push(DeviceMetric {
+                    device: device.name.to_owned(),
+                    value,
+                    labels: match variable.labels() {
+                        Some(l) => l.to_owned(),
+                        None => HashMap::new(),
+                    },
+                });
             } else {
-                let var_type = var.get("type").unwrap().to_string();
-                let help = var.get("help").unwrap().to_string();
+                let metric = Metric {
+                    name,
+                    mtype: variable.get("type").to_string(),
+                    help: variable.get("help").to_string(),
+                    metrics: vec!(DeviceMetric {
+                        device: device.name.to_owned(),
+                        value,
+                        labels: match variable.labels() {
+                            Some(l) => l.to_owned(),
+                            None => HashMap::new(),
+                        },
+                    })
+                };
 
-                let mut var = Variable::new(label, var_type, help);
-                var.device_values.insert(device.name.to_owned(), value);
-
-                variables.push(var);
+                all_metrics.push(metric);
             }
         }
     }
 
-    for var in variables {
-        body.push_str(format!("# HELP {} {}\n", var.name, var.help).as_str());
-        body.push_str(format!("# TYPE {} {}\n", var.name, var.var_type).as_str());
+    for metric in all_metrics {
+        body.push_str(format!("# HELP {} {}\n", metric.name, metric.help).as_str());
+        body.push_str(format!("# TYPE {} {}\n", metric.name, metric.mtype).as_str());
 
-        for device in var.device_values {
-            let (device, value) = device;
-            body.push_str(format!("{}{{device=\"{}\"}} {}\n", var.name, device, value).as_str());
+        for device_metric in metric.metrics {
+            let mut inner: String = format!("device=\"{}\"", device_metric.device);
+            for label in device_metric.labels {
+                let (k, v) = label;
+                inner = format!("{},{}=\"{}\"", inner, k, v);
+            }
+            body.push_str(format!(
+                "padm_{}{{{}}} {}\n",
+                metric.name,
+                inner,
+                device_metric.value,
+            ).as_str());
         }
     }
-    body
+    Ok(body)
 }
 
 pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
@@ -81,7 +116,7 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
 
     // Spawn client threads
     for endpoint in config.endpoints() {
-        let client = padm_client::client::PADMClient::new(
+        let client = PADMClient::new(
             endpoint.host().as_str(),
             endpoint.scheme(),
             endpoint.tls_insecure(),
@@ -112,22 +147,26 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
         for arc in &device_arcs {
             all_devices.append(&mut arc.lock().unwrap().to_owned());
         }
-        let output = format_output_from_devices(&all_devices);
-        *body.lock().unwrap() = output;
+        match format_output_from_devices(&all_devices) {
+            Ok(output) => *body.lock().unwrap() = output,
+            Err(e) => error!("Failed formatting metrics output: {}", e)
+        }
     }
 }
 
 async fn client_run(
-    client: padm_client::client::PADMClient,
-    devices_arc: Arc<Mutex<Vec<padm_client::device::Device>>>,
+    client: PADMClient,
+    devices_arc: Arc<Mutex<Vec<Device>>>,
     main_thread: std::thread::Thread,
 ) {
     loop {
-        let devices = get_devices_from(&client)
-            .await
-            .expect("Failed getting devices from client!");
-        *devices_arc.lock().unwrap() = devices;
+        match get_devices_from(&client).await {
+            Ok(devices) => {
+                *devices_arc.lock().unwrap() = devices;
+            },
+            Err(e) => error!("Failed getting devices from client {}: {}", &client.host(), e),
+        }
         main_thread.unpark();
-        async_std::task::sleep(Duration::from_millis(client.interval() * 1000)).await;
+        async_std::task::sleep(Duration::from_secs(client.interval())).await;
     }
 }

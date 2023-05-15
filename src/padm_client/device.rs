@@ -1,14 +1,13 @@
 use serde_json;
-use std::collections::HashMap;
 
-use crate::padm_client::variables::{is_metric, unpack_variable};
+use crate::padm_client::variables::{Variable, is_metric, unpack_variable};
 
 #[derive(Debug, Clone)]
 pub struct Device {
     pub id: i64,
     pub name: String,
     pub device_type: String,
-    pub variables: Vec<HashMap<String, String>>,
+    pub variables: Vec<Variable>,
 }
 
 pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>, std::io::Error> {
@@ -27,7 +26,7 @@ pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>, std::io::E
                 }
             }
 
-            let mut variables: Vec<HashMap<String, String>> = Vec::new();
+            let mut variables = Vec::new();
             let variable = unpack_variable(item);
             variables.push(variable);
 
