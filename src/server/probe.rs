@@ -112,30 +112,35 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
     let (tx, mut rx): (mpsc::UnboundedSender<()>, mpsc::UnboundedReceiver<()>) =
         mpsc::unbounded_channel();
 
-    let devices: Arc<Mutex<Vec<Device>>> =
+    let devices_vec: Arc<Mutex<Vec<Vec<Device>>>> =
         Arc::new(Mutex::new(Vec::with_capacity(config.endpoints().len())));
 
-    // Spawn client threads
-    for endpoint in config.endpoints() {
-        let client = PADMClient::new(
-            endpoint.host().as_str(),
-            endpoint.scheme(),
-            endpoint.tls_insecure(),
-            endpoint.interval(),
-            endpoint.username(),
-            endpoint.password(),
-        );
-
-        let devices = Arc::clone(&devices);
-        let thread_tx = tx.clone();
-        tokio::task::spawn(client_run(client, devices, thread_tx));
-    }
+    config
+        .endpoints()
+        .iter()
+        .map(|e| {
+            PADMClient::new(
+                e.host().as_str(),
+                e.scheme(),
+                e.tls_insecure(),
+                e.interval(),
+                e.username(),
+                e.password(),
+            )
+        })
+        .enumerate()
+        // Spawn client threads
+        .for_each(|(idx, client)| {
+            let devices_vec = Arc::clone(&devices_vec);
+            let thread_tx = tx.clone();
+            tokio::task::spawn(client_run(client, idx, devices_vec, thread_tx));
+        });
 
     loop {
         // Blocks until data
         rx.recv().await.unwrap();
 
-        let devices = devices.lock().unwrap();
+        let devices = devices_vec.lock().unwrap().concat();
         match format_output_from_devices(&devices) {
             Ok(output) => *body.lock().unwrap() = output,
             Err(e) => error!("Failed formatting metrics output: {}", e),
@@ -145,14 +150,17 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
 
 async fn client_run(
     client: PADMClient,
-    devices: Arc<Mutex<Vec<Device>>>,
+    index: usize,
+    devices_vec: Arc<Mutex<Vec<Vec<Device>>>>,
     thread_tx: mpsc::UnboundedSender<()>,
 ) {
     let mut interval = tokio::time::interval(Duration::from_secs(client.interval()));
     loop {
         interval.tick().await;
         match get_devices_from(&client).await {
-            Ok(d) => *devices.lock().unwrap() = d,
+            Ok(d) => {
+                devices_vec.lock().unwrap()[index] = d;
+            }
             Err(e) => error!(
                 "Failed getting devices from client {}: {}",
                 &client.host(),
