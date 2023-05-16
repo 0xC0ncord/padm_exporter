@@ -11,11 +11,11 @@ pub struct Device {
 }
 
 pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>, std::io::Error> {
-    let mut devices: Vec<Device> = Vec::new();
+    let data = json["data"].as_array().unwrap();
+    // micro-optimization
+    let mut devices: Vec<Device> = Vec::with_capacity(data.len());
 
-    let items: Vec<&serde_json::Map<String, serde_json::Value>> = json["data"]
-        .as_array()
-        .unwrap()
+    let items: Vec<&serde_json::Map<String, serde_json::Value>> = data
         .iter()
         .filter_map(|item| item["attributes"].as_object())
         .filter_map(|item| is_metric(&item).then_some(item))
