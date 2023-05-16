@@ -158,9 +158,7 @@ async fn client_run(
     loop {
         interval.tick().await;
         match get_devices_from(&client).await {
-            Ok(d) => {
-                devices_vec.lock().unwrap()[index] = d;
-            }
+            Ok(d) => devices_vec.lock().unwrap()[index] = d,
             Err(e) => error!(
                 "Failed getting devices from client {}: {}",
                 &client.host(),
