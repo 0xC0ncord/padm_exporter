@@ -1,12 +1,14 @@
 use log::error;
 use std::collections::HashMap;
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use std::thread;
 use std::time::Duration;
-use tokio::runtime::Runtime;
 
 use crate::config;
-use crate::padm_client::{client::PADMClient, device::{Device, load_all_from}};
+use crate::padm_client::{
+    client::PADMClient,
+    device::{load_all_from, Device},
+};
 
 #[derive(Debug, Clone)]
 struct Metric {
@@ -23,36 +25,28 @@ struct DeviceMetric {
     labels: HashMap<String, String>,
 }
 
-async fn get_devices_from(
-    client: &PADMClient,
-) -> Result<Vec<Device>, anyhow::Error> {
+async fn get_devices_from(client: &PADMClient) -> Result<Vec<Device>, anyhow::Error> {
     let response = client.do_get("/api/variables").await;
     match response {
         Err(e) => Err(e.into()),
-        Ok(r) => {
-            match r.error_for_status() {
+        Ok(r) => match r.error_for_status() {
+            Err(e) => Err(e.into()),
+            Ok(r) => match r.text().await {
                 Err(e) => Err(e.into()),
-                Ok(r) => {
-                    match r.text().await {
+                Ok(s) => {
+                    let json = serde_json::from_str(&s);
+                    let devices = load_all_from(&json?);
+                    match devices {
+                        Ok(v) => Ok(v),
                         Err(e) => Err(e.into()),
-                        Ok(s) => {
-                            let json = serde_json::from_str(&s);
-                            let devices = load_all_from(&json?);
-                            match devices {
-                                Ok(v) => Ok(v),
-                                Err(e) => Err(e.into()),
-                            }
-                        }
                     }
-                },
-            }
-        }
+                }
+            },
+        },
     }
 }
 
-fn format_output_from_devices(
-    devices: &Vec<Device>
-) -> Result<String, std::io::Error> {
+fn format_output_from_devices(devices: &Vec<Device>) -> Result<String, std::io::Error> {
     let mut body: String = String::new();
     let mut all_metrics: Vec<Metric> = Vec::new();
 
@@ -75,14 +69,14 @@ fn format_output_from_devices(
                     name,
                     mtype: variable.get("type").to_string(),
                     help: variable.get("help").to_string(),
-                    metrics: vec!(DeviceMetric {
+                    metrics: vec![DeviceMetric {
                         device: device.name.to_owned(),
                         value,
                         labels: match variable.labels() {
                             Some(l) => l.to_owned(),
                             None => HashMap::new(),
                         },
-                    })
+                    }],
                 };
 
                 all_metrics.push(metric);
@@ -100,19 +94,23 @@ fn format_output_from_devices(
                 let (k, v) = label;
                 inner = format!("{},{}=\"{}\"", inner, k, v);
             }
-            body.push_str(format!(
-                "padm_{}{{{}}} {}\n",
-                metric.name,
-                inner,
-                device_metric.value,
-            ).as_str());
+            body.push_str(
+                format!(
+                    "padm_{}{{{}}} {}\n",
+                    metric.name, inner, device_metric.value,
+                )
+                .as_str(),
+            );
         }
     }
     Ok(body)
 }
 
 pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
-    let mut device_arcs = Vec::new();
+    let (tx, rx): (mpsc::Sender<()>, mpsc::Receiver<()>) = mpsc::channel();
+
+    let devices: Arc<Mutex<Vec<Device>>> =
+        Arc::new(Mutex::new(Vec::with_capacity(config.endpoints().len())));
 
     // Spawn client threads
     for endpoint in config.endpoints() {
@@ -125,48 +123,39 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
             endpoint.password(),
         );
 
-        let arc = Arc::new(Mutex::new(Vec::new()));
-        let arc_clone = arc.clone();
-        let current = thread::current();
-
-        thread::spawn(move || {
-            let rt = Runtime::new().unwrap();
-            rt.block_on(async move { client_run(client, arc_clone, current).await });
-            loop {
-                thread::park();
-            }
-        });
-
-        device_arcs.push(arc);
+        let devices = Arc::clone(&devices);
+        let thread_tx = tx.clone();
+        tokio::task::spawn(client_run(client, devices, thread_tx));
     }
 
     loop {
-        thread::park();
+        // Blocks until data
+        rx.recv().unwrap();
 
-        let mut all_devices = Vec::new();
-        for arc in &device_arcs {
-            all_devices.append(&mut arc.lock().unwrap().to_owned());
-        }
-        match format_output_from_devices(&all_devices) {
+        let devices = devices.lock().unwrap();
+        match format_output_from_devices(&devices) {
             Ok(output) => *body.lock().unwrap() = output,
-            Err(e) => error!("Failed formatting metrics output: {}", e)
+            Err(e) => error!("Failed formatting metrics output: {}", e),
         }
     }
 }
 
 async fn client_run(
     client: PADMClient,
-    devices_arc: Arc<Mutex<Vec<Device>>>,
-    main_thread: std::thread::Thread,
+    devices: Arc<Mutex<Vec<Device>>>,
+    thread_tx: mpsc::Sender<()>,
 ) {
+    let mut interval = tokio::time::interval(Duration::from_secs(client.interval()));
     loop {
+        interval.tick().await;
         match get_devices_from(&client).await {
-            Ok(devices) => {
-                *devices_arc.lock().unwrap() = devices;
-            },
-            Err(e) => error!("Failed getting devices from client {}: {}", &client.host(), e),
+            Ok(d) => *devices.lock().unwrap() = d,
+            Err(e) => error!(
+                "Failed getting devices from client {}: {}",
+                &client.host(),
+                e
+            ),
         }
-        main_thread.unpark();
-        async_std::task::sleep(Duration::from_secs(client.interval())).await;
+        thread_tx.send(()).unwrap()
     }
 }
