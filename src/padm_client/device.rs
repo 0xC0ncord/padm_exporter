@@ -18,22 +18,23 @@ pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>, std::io::E
     let items: Vec<&serde_json::Map<String, serde_json::Value>> = data
         .iter()
         .filter_map(|item| item["attributes"].as_object())
-        .filter_map(|item| is_metric(&item).then_some(item))
+        .filter(|item| is_metric(&item))
+        .filter(|item| {
+            match devices
+                .iter_mut()
+                .find(|device| device.id == item["device_id"].as_i64().unwrap())
+            {
+                Some(device) => {
+                    let variable = unpack_variable(item);
+                    device.variables.push(variable);
+                    false
+                }
+                None => true,
+            }
+        })
         .collect();
 
     for item in items {
-        match devices
-            .iter_mut()
-            .find(|device| device.id == item["device_id"].as_i64().unwrap())
-        {
-            Some(device) => {
-                let variable = unpack_variable(item);
-                device.variables.push(variable);
-                continue;
-            }
-            None => (),
-        }
-
         let variables = vec![unpack_variable(item)];
         let id = item["device_id"].as_i64().unwrap();
         let name = item["device_name"].as_str().unwrap().to_string();
