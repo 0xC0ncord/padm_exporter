@@ -1,8 +1,10 @@
 use log::error;
 use std::collections::HashMap;
-use std::sync::mpsc;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+use tokio::sync::mpsc;
 
 use crate::config;
 use crate::padm_client::{
@@ -107,7 +109,8 @@ fn format_output_from_devices(devices: &Vec<Device>) -> Result<String, std::io::
 }
 
 pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
-    let (tx, rx): (mpsc::Sender<()>, mpsc::Receiver<()>) = mpsc::channel();
+    let (tx, mut rx): (mpsc::UnboundedSender<()>, mpsc::UnboundedReceiver<()>) =
+        mpsc::unbounded_channel();
 
     let devices: Arc<Mutex<Vec<Device>>> =
         Arc::new(Mutex::new(Vec::with_capacity(config.endpoints().len())));
@@ -130,7 +133,7 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
 
     loop {
         // Blocks until data
-        rx.recv().unwrap();
+        rx.recv().await.unwrap();
 
         let devices = devices.lock().unwrap();
         match format_output_from_devices(&devices) {
@@ -143,7 +146,7 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
 async fn client_run(
     client: PADMClient,
     devices: Arc<Mutex<Vec<Device>>>,
-    thread_tx: mpsc::Sender<()>,
+    thread_tx: mpsc::UnboundedSender<()>,
 ) {
     let mut interval = tokio::time::interval(Duration::from_secs(client.interval()));
     loop {
