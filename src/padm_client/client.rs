@@ -118,9 +118,9 @@ impl PADMClient {
 
         let response = self.raw_get(&url).await;
         match response {
-            Ok(r) => Ok(r),
-            Err(err) => {
-                match err.status() {
+            Ok(r) => match r.error_for_status() {
+                Ok(r) => Ok(r),
+                Err(err) => match err.status() {
                     Some(reqwest::StatusCode::UNAUTHORIZED) => {
                         // Authenticate again if needed
                         self.authenticate().await?;
@@ -130,6 +130,7 @@ impl PADMClient {
                     _ => Err(err)
                 }
             }
+            Err(err) => Err(err),
         }
     }
 }
