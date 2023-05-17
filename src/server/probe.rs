@@ -1,8 +1,10 @@
 use log::error;
-use std::collections::HashMap;
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+use indexmap::IndexMap;
 
 use tokio::sync::mpsc;
 
@@ -14,7 +16,6 @@ use crate::padm_client::{
 
 #[derive(Debug, Clone)]
 struct Metric {
-    name: String,
     mtype: String,
     help: String,
     metrics: Vec<DeviceMetric>,
@@ -49,63 +50,52 @@ async fn get_devices_from(client: &PADMClient) -> Result<Vec<Device>, anyhow::Er
 }
 
 fn format_output_from_devices(devices: &Vec<Device>) -> Result<String, std::io::Error> {
-    let mut body: String = String::new();
-    let mut all_metrics: Vec<Metric> = Vec::new();
+    let mut metrics: IndexMap<&str, Metric> = IndexMap::new();
 
-    for device in devices {
-        for variable in &device.variables {
-            let name = variable.get("name").to_string();
-            let value = variable.get("value").to_string();
-
-            if let Some(metric) = all_metrics.iter_mut().find(|x| x.name == name) {
-                metric.metrics.push(DeviceMetric {
-                    device: device.name.to_owned(),
-                    value,
-                    labels: match variable.labels() {
-                        Some(l) => l.to_owned(),
-                        None => HashMap::new(),
-                    },
-                });
-            } else {
-                let metric = Metric {
-                    name,
-                    mtype: variable.get("type").to_string(),
-                    help: variable.get("help").to_string(),
-                    metrics: vec![DeviceMetric {
-                        device: device.name.to_owned(),
-                        value,
-                        labels: match variable.labels() {
-                            Some(l) => l.to_owned(),
-                            None => HashMap::new(),
-                        },
-                    }],
+    devices
+        .iter()
+        .map(|device| (&device.name, &device.variables))
+        .for_each(|(name, variables)| {
+            variables.iter().for_each(|variable| {
+                let device_metric = DeviceMetric {
+                    device: name.to_string(),
+                    value: variable.get("value").to_string(),
+                    labels: variable.labels().clone().unwrap_or(HashMap::new()),
                 };
 
-                all_metrics.push(metric);
-            }
-        }
-    }
+                let var_name = variable.get("name");
+                metrics
+                    .entry(var_name)
+                    .and_modify(|m| m.metrics.push(device_metric.clone()))
+                    .or_insert(Metric {
+                        mtype: variable.get("type").to_string(),
+                        help: variable.get("help").to_string(),
+                        metrics: vec![device_metric],
+                    });
+            })
+        });
 
-    for metric in all_metrics {
-        body.push_str(format!("# HELP {} {}\n", metric.name, metric.help).as_str());
-        body.push_str(format!("# TYPE {} {}\n", metric.name, metric.mtype).as_str());
+    let body = metrics.iter().map(|(name, metric)| {
+        let mut body = format!(
+            "# HELP {} {}\n\
+            #TYPE {} {}\n",
+            name, metric.help, name, metric.mtype
+        )
+        .to_string();
+        let m_str = metric.metrics.iter().map(|device_metric| {
+            let labels = device_metric
+                .labels
+                .iter()
+                .map(|(k, v)| format!(",{}=\"{}\"", k, v));
+            let mut inner = format!("device=\"{}\"", device_metric.device).to_string();
+            inner.push_str(labels.collect::<String>().as_str());
+            format!("padm_{}{{{}}} {}\n", name, inner, device_metric.value)
+        });
+        body.push_str(m_str.collect::<String>().as_str());
+        body
+    });
 
-        for device_metric in metric.metrics {
-            let mut inner: String = format!("device=\"{}\"", device_metric.device);
-            for label in device_metric.labels {
-                let (k, v) = label;
-                inner = format!("{},{}=\"{}\"", inner, k, v);
-            }
-            body.push_str(
-                format!(
-                    "padm_{}{{{}}} {}\n",
-                    metric.name, inner, device_metric.value,
-                )
-                .as_str(),
-            );
-        }
-    }
-    Ok(body)
+    Ok(body.collect())
 }
 
 pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
