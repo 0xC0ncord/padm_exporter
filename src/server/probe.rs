@@ -109,11 +109,7 @@ fn format_output_from_devices(devices: &Vec<Device>) -> Result<String, std::io::
 }
 
 pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
-    let (tx, mut rx): (mpsc::UnboundedSender<()>, mpsc::UnboundedReceiver<()>) =
-        mpsc::unbounded_channel();
-
-    let devices_vec: Arc<Mutex<Vec<Vec<Device>>>> =
-        Arc::new(Mutex::new(Vec::with_capacity(config.endpoints().len())));
+    let (tx, mut rx) = mpsc::unbounded_channel::<(Vec<Device>, usize)>();
 
     config
         .endpoints()
@@ -131,16 +127,18 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
         .enumerate()
         // Spawn client threads
         .for_each(|(idx, client)| {
-            let devices_vec = Arc::clone(&devices_vec);
             let thread_tx = tx.clone();
-            tokio::task::spawn(client_run(client, idx, devices_vec, thread_tx));
+            tokio::task::spawn(client_run(client, idx, thread_tx));
         });
+
+    let mut devices_vec: Vec<Vec<Device>> = Vec::with_capacity(config.endpoints().len());
 
     loop {
         // Blocks until data
-        rx.recv().await.unwrap();
+        let (d, i) = rx.recv().await.unwrap();
+        devices_vec[i] = d;
 
-        let devices = devices_vec.lock().unwrap().concat();
+        let devices = devices_vec.concat();
         match format_output_from_devices(&devices) {
             Ok(output) => *body.lock().unwrap() = output,
             Err(e) => error!("Failed formatting metrics output: {}", e),
@@ -151,20 +149,18 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
 async fn client_run(
     client: PADMClient,
     index: usize,
-    devices_vec: Arc<Mutex<Vec<Vec<Device>>>>,
-    thread_tx: mpsc::UnboundedSender<()>,
+    thread_tx: mpsc::UnboundedSender<(Vec<Device>, usize)>,
 ) {
     let mut interval = tokio::time::interval(Duration::from_secs(client.interval()));
     loop {
         interval.tick().await;
         match get_devices_from(&client).await {
-            Ok(d) => devices_vec.lock().unwrap()[index] = d,
+            Ok(d) => thread_tx.send((d, index)).unwrap(),
             Err(e) => error!(
                 "Failed getting devices from client {}: {}",
                 &client.host(),
                 e
             ),
         }
-        thread_tx.send(()).unwrap()
     }
 }
