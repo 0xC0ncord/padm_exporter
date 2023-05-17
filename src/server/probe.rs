@@ -77,8 +77,7 @@ fn format_output_from_devices(devices: &Vec<Device>) -> Result<String, std::io::
 
     let body = metrics.iter().map(|(name, metric)| {
         let mut body = format!(
-            "# HELP {} {}\n\
-            #TYPE {} {}\n",
+            "# HELP {} {}\n# TYPE {} {}\n",
             name, metric.help, name, metric.mtype
         )
         .to_string();
