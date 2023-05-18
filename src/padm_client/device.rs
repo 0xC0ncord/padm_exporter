@@ -1,5 +1,7 @@
 use serde_json;
 
+use indexmap::IndexMap;
+
 use crate::padm_client::variables::{is_metric, unpack_variable, Variable};
 
 #[derive(Debug, Clone)]
@@ -13,39 +15,28 @@ pub struct Device {
 pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>, std::io::Error> {
     let data = json["data"].as_array().unwrap();
     // micro-optimization
-    let mut devices: Vec<Device> = Vec::with_capacity(data.len());
-
-    let items: Vec<&serde_json::Map<String, serde_json::Value>> = data
+    let devices: IndexMap<i64, Device> = IndexMap::with_capacity(data.len());
+    let items = data
         .iter()
-        .filter_map(|item| item["attributes"].as_object())
-        .filter(|item| is_metric(&item))
-        .filter(|item| {
-            match devices
-                .iter_mut()
-                .find(|device| device.id == item["device_id"].as_i64().unwrap())
-            {
-                Some(device) => {
-                    let variable = unpack_variable(item);
-                    device.variables.push(variable);
-                    false
-                }
-                None => true,
-            }
-        })
-        .collect();
+        .filter_map(|i| i["attribute"].as_object())
+        .filter(|i| is_metric(&i));
 
     for item in items {
-        let variables = vec![unpack_variable(item)];
         let id = item["device_id"].as_i64().unwrap();
-        let name = item["device_name"].as_str().unwrap().to_string();
-        let device_type = item["device_type"].as_str().unwrap().to_string();
-
-        devices.push(Device {
-            id,
-            name,
-            device_type,
-            variables,
-        })
+        let variable = unpack_variable(item);
+        devices
+            .entry(id)
+            .and_modify(|device| device.variables.push(variable))
+            .or_insert_with(|| {
+                let name = item["device_name"].as_str().unwrap().to_string();
+                let device_type = item["device_type"].as_str().unwrap().to_string();
+                Device {
+                    id,
+                    name,
+                    device_type,
+                    variables: vec![variable],
+                }
+            });
     }
-    Ok(devices)
+    Ok(devices.into_values().collect())
 }
