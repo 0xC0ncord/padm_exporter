@@ -1,6 +1,8 @@
 use serde_json;
 
-use crate::padm_client::variables::{Variable, is_metric, unpack_variable};
+use indexmap::IndexMap;
+
+use crate::padm_client::variables::{is_metric, unpack_variable, Variable};
 
 #[derive(Debug, Clone)]
 pub struct Device {
@@ -11,37 +13,30 @@ pub struct Device {
 }
 
 pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>, std::io::Error> {
-    let mut devices: Vec<Device> = Vec::new();
+    let data = json["data"].as_array().unwrap();
+    // micro-optimization
+    let devices: IndexMap<i64, Device> = IndexMap::with_capacity(data.len());
+    let items = data
+        .iter()
+        .filter_map(|i| i["attribute"].as_object())
+        .filter(|i| is_metric(&i));
 
-    for item in json["data"].as_array().unwrap() {
-        'inner: for item in &item["attributes"].as_object() {
-            if !is_metric(item) {
-                continue;
-            }
-            for device in &mut devices {
-                if device.id == item["device_id"].as_i64().unwrap() {
-                    let variable = unpack_variable(item);
-                    device.variables.push(variable);
-                    break 'inner;
+    for item in items {
+        let id = item["device_id"].as_i64().unwrap();
+        let variable = unpack_variable(item);
+        devices
+            .entry(id)
+            .and_modify(|device| device.variables.push(variable))
+            .or_insert_with(|| {
+                let name = item["device_name"].as_str().unwrap().to_string();
+                let device_type = item["device_type"].as_str().unwrap().to_string();
+                Device {
+                    id,
+                    name,
+                    device_type,
+                    variables: vec![variable],
                 }
-            }
-
-            let mut variables = Vec::new();
-            let variable = unpack_variable(item);
-            variables.push(variable);
-
-            let id = item["device_id"].as_i64().unwrap();
-            let name = item["device_name"].as_str().unwrap().to_string();
-            let device_type = item["device_type"].as_str().unwrap().to_string();
-
-            devices.push(Device {
-                id,
-                name,
-                device_type,
-                variables,
             });
-        }
     }
-
-    Ok(devices)
+    Ok(devices.into_values().collect())
 }
