@@ -1,6 +1,6 @@
 use log::error;
 use serde::Deserialize;
-use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
 
 #[derive(Deserialize)]
 pub struct AuthData {
@@ -31,7 +31,7 @@ pub struct PADMClient {
     interval: u64,
     username: String,
     password: String,
-    auth_data: Arc<Mutex<AuthData>>,
+    auth_data: RefCell<AuthData>,
 }
 impl PADMClient {
     pub fn new(
@@ -58,7 +58,7 @@ impl PADMClient {
             username: username.to_string(),
             password: password.to_string(),
             interval,
-            auth_data: Arc::new(Mutex::new(AuthData::new())),
+            auth_data: RefCell::new(AuthData::new()),
         }
     }
     pub fn interval(&self) -> u64 {
@@ -72,29 +72,27 @@ impl PADMClient {
         let request_url = format!("https://{}/api/oauth/token?grant_type=password", self.host);
         let params = [("username", &self.username), ("password", &self.password)];
 
-        let response = self.client
-            .post(&request_url)
-            .form(&params)
-            .send()
-            .await;
+        let response = self.client.post(&request_url).form(&params).send().await;
 
         match response {
             Err(e) => {
                 error!("Authentication failed on endpoint {}: {}", self.host(), e);
                 Err(e)
-            },
-            Ok(r) => {
-                match r.json().await {
-                    Err(e) => {
-                        error!("Malformed auth response from endpoint {}: {}", self.host(), e);
-                        Err(e)
-                    },
-                    Ok(j) => {
-                        *self.auth_data.lock().unwrap() = j;
-                        Ok(())
-                    }
-                }
             }
+            Ok(r) => match r.json().await {
+                Err(e) => {
+                    error!(
+                        "Malformed auth response from endpoint {}: {}",
+                        self.host(),
+                        e
+                    );
+                    Err(e)
+                }
+                Ok(j) => {
+                    self.auth_data.replace(j);
+                    Ok(())
+                }
+            },
         }
     }
     async fn raw_get(&self, url: &str) -> Result<reqwest::Response, reqwest::Error> {
@@ -102,7 +100,7 @@ impl PADMClient {
             .get(url)
             .header(
                 reqwest::header::AUTHORIZATION,
-                format!("Bearer {}", &self.auth_data.lock().unwrap().access_token),
+                format!("Bearer {}", &self.auth_data.borrow().access_token),
             )
             .send()
             .await
@@ -112,7 +110,7 @@ impl PADMClient {
         let url = format!("{}://{}{}", self.scheme, self.host, path);
 
         // Authenticate if never authenticated before
-        if self.auth_data.lock().unwrap().is_empty() {
+        if self.auth_data.borrow().is_empty() {
             self.authenticate().await?;
         }
 
@@ -125,11 +123,11 @@ impl PADMClient {
                         // Authenticate again if needed
                         self.authenticate().await?;
                         Ok(self.raw_get(&url).await?)
-                    },
+                    }
                     // Otherwise just return the error
-                    _ => Err(err)
-                }
-            }
+                    _ => Err(err),
+                },
+            },
             Err(err) => Err(err),
         }
     }
