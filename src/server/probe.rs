@@ -6,7 +6,10 @@ use std::time::Duration;
 use tokio::runtime::Runtime;
 
 use crate::config;
-use crate::padm_client::{client::PADMClient, device::{Device, load_all_from}};
+use crate::padm_client::{
+    client::PADMClient,
+    device::{load_all_from, Device},
+};
 
 #[derive(Debug, Clone)]
 struct Metric {
@@ -23,36 +26,21 @@ struct DeviceMetric {
     labels: HashMap<String, String>,
 }
 
-async fn get_devices_from(
-    client: &PADMClient,
-) -> Result<Vec<Device>, anyhow::Error> {
+async fn get_devices_from(client: &PADMClient) -> Result<Vec<Device>, anyhow::Error> {
     let response = client.do_get("/api/variables").await;
-    match response {
-        Err(e) => Err(e.into()),
-        Ok(r) => {
-            match r.error_for_status() {
-                Err(e) => Err(e.into()),
-                Ok(r) => {
-                    match r.text().await {
-                        Err(e) => Err(e.into()),
-                        Ok(s) => {
-                            let json = serde_json::from_str(&s);
-                            let devices = load_all_from(&json?);
-                            match devices {
-                                Ok(v) => Ok(v),
-                                Err(e) => Err(e.into()),
-                            }
-                        }
-                    }
-                },
-            }
-        }
+    match response
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| anyhow::Error::from(e))
+    {
+        Ok(r) => r.text().await.map_err(|e| e.into()).and_then(|s| {
+            let json = serde_json::from_str(&s).map_err(|e| anyhow::Error::from(e))?;
+            load_all_from(&json).map_err(|e| e.into())
+        }),
+        Err(e) => Err(e),
     }
 }
 
-fn format_output_from_devices(
-    devices: &Vec<Device>
-) -> Result<String, std::io::Error> {
+fn format_output_from_devices(devices: &Vec<Device>) -> Result<String, std::io::Error> {
     let mut body: String = String::new();
     let mut all_metrics: Vec<Metric> = Vec::new();
 
@@ -75,14 +63,14 @@ fn format_output_from_devices(
                     name,
                     mtype: variable.get("type").to_string(),
                     help: variable.get("help").to_string(),
-                    metrics: vec!(DeviceMetric {
+                    metrics: vec![DeviceMetric {
                         device: device.name.to_owned(),
                         value,
                         labels: match variable.labels() {
                             Some(l) => l.to_owned(),
                             None => HashMap::new(),
                         },
-                    })
+                    }],
                 };
 
                 all_metrics.push(metric);
@@ -100,12 +88,13 @@ fn format_output_from_devices(
                 let (k, v) = label;
                 inner = format!("{},{}=\"{}\"", inner, k, v);
             }
-            body.push_str(format!(
-                "padm_{}{{{}}} {}\n",
-                metric.name,
-                inner,
-                device_metric.value,
-            ).as_str());
+            body.push_str(
+                format!(
+                    "padm_{}{{{}}} {}\n",
+                    metric.name, inner, device_metric.value,
+                )
+                .as_str(),
+            );
         }
     }
     Ok(body)
@@ -149,7 +138,7 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
         }
         match format_output_from_devices(&all_devices) {
             Ok(output) => *body.lock().unwrap() = output,
-            Err(e) => error!("Failed formatting metrics output: {}", e)
+            Err(e) => error!("Failed formatting metrics output: {}", e),
         }
     }
 }
@@ -163,8 +152,12 @@ async fn client_run(
         match get_devices_from(&client).await {
             Ok(devices) => {
                 *devices_arc.lock().unwrap() = devices;
-            },
-            Err(e) => error!("Failed getting devices from client {}: {}", &client.host(), e),
+            }
+            Err(e) => error!(
+                "Failed getting devices from client {}: {}",
+                &client.host(),
+                e
+            ),
         }
         main_thread.unpark();
         async_std::task::sleep(Duration::from_secs(client.interval())).await;
