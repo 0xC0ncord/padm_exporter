@@ -9,6 +9,7 @@ use crate::client::auth::AuthData;
 */
 pub struct PADMClient {
     client: reqwest::Client,
+    addr: String,
     url: String,
     interval: u64,
     username: String,
@@ -17,7 +18,8 @@ pub struct PADMClient {
 }
 impl PADMClient {
     pub fn new(
-        url: &str,
+        addr: String,
+        url: String,
         tls_insecure: bool,
         interval: u64,
         username: &str,
@@ -34,6 +36,7 @@ impl PADMClient {
 
         PADMClient {
             client,
+            addr,
             url: url.to_string(),
             username: username.to_string(),
             password: password.to_string(),

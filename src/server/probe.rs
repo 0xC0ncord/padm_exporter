@@ -106,6 +106,7 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
     // Spawn client threads
     for target in config.targets() {
         let client = PADMClient::new(
+            target.addr(),
             target.url(),
             target.tls_insecure(),
             target.interval(),

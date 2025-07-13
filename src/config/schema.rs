@@ -31,15 +31,29 @@ impl Config {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Target {
-    url: String,
+    host: String,
+    port: Option<String>,
+    scheme: Option<String>,
     tls_insecure: Option<bool>,
     interval: Option<u64>,
     username: String,
     password: String,
 }
 impl Target {
-    pub fn url(&self) -> &str {
-        self.url.as_str()
+    pub fn addr(&self) -> String {
+        let mut addr = self.host.to_string();
+        if let Some(port) = &self.port {
+            addr.push_str(&format!(":{port}"));
+        }
+        addr
+    }
+    pub fn url(&self) -> String {
+        let scheme = self.scheme.as_deref().unwrap_or("https");
+        let mut url = format!("{}://{}", scheme, self.host);
+        if let Some(port) = &self.port {
+            url.push_str(&format!(":{port}"));
+        }
+        url
     }
     pub fn tls_insecure(&self) -> bool {
         self.tls_insecure.unwrap_or(false)

@@ -17,7 +17,8 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             "Operating Mode",
             HashMap::from([
                 ("name", "operating_mode"),
-                ("type", "gauge"),
+                ("type", "gauge_vec"),
+                ("vec_label", "mode"),
                 ("help", "Device operating mode."),
             ]),
         ),
@@ -25,7 +26,8 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             "LCD Display Units (Cooling)",
             HashMap::from([
                 ("name", "lcd_display_units"),
-                ("type", "gauge"),
+                ("type", "gauge_vec"),
+                ("vec_label", "mode"),
                 ("help", "Units displayed on the LCD screen."),
             ]),
         ),
@@ -33,7 +35,8 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             "Dehumidifying Mode",
             HashMap::from([
                 ("name", "dehumidifying_mode"),
-                ("type", "gauge"),
+                ("type", "gauge_vec"),
+                ("vec_label", "mode"),
                 ("help", "Device dehumidifying mode."),
             ]),
         ),
@@ -57,7 +60,8 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
             "Fan Speed",
             HashMap::from([
                 ("name", "fan_speed"),
-                ("type", "gauge"),
+                ("type", "gauge_vec"),
+                ("vec_label", "mode"),
                 ("help", "Device fan speed setting."),
             ]),
         ),
@@ -172,7 +176,8 @@ static PADM_VARIABLE_MAP: Lazy<Mutex<HashMap<&str, HashMap<&str, &str>>>> = Lazy
 #[derive(Debug, Clone)]
 pub struct Variable {
     name: String,
-    vtype: String,
+    variable_type: String,
+    vec_label: Option<String>,
     help: String,
     value: String,
     labels: Option<HashMap<String, String>>,
@@ -181,7 +186,7 @@ impl Variable {
     pub fn get(&self, field: &str) -> &str {
         match field {
             "name" => &self.name,
-            "type" => &self.vtype,
+            "type" => &self.variable_type,
             "help" => &self.help,
             "value" => &self.value,
             _ => "",
@@ -328,12 +333,12 @@ pub fn unpack_variable(data: &Map<String, serde_json::Value>) -> Variable {
     };
 
     let var_name = extract("name");
-
     let (value, labels) = mutate_variable(&var_name, data["value"].as_str().unwrap());
 
     Variable {
         name: var_name.to_owned(),
-        vtype: extract("type"),
+        variable_type: extract("type"),
+        vec_label: Some(extract("vec_label")),
         help: extract("help"),
         value: value.to_owned(),
         labels,
