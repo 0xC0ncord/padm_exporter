@@ -1,9 +1,10 @@
-mod config;
-mod padm_client;
-mod server;
-
 use anyhow::Result;
 use clap::Parser;
+
+mod config;
+mod client;
+mod device;
+mod server;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]

@@ -7,9 +7,9 @@ use std::time::Duration;
 use tokio::runtime::Runtime;
 
 use crate::config;
-use crate::padm_client::{
-    client::PADMClient,
-    device::{load_all_from, Device},
+use crate::device::{load_all_from, Device};
+use crate::client::{
+    PADMClient,
 };
 
 #[derive(Debug, Clone)]

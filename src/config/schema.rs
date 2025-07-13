@@ -1,6 +1,4 @@
-use anyhow::Result;
 use serde::Deserialize;
-use std::fs;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -70,10 +68,4 @@ impl Endpoint {
     pub fn host(&self) -> String {
         format!("{}:{}", self.ip(), self.port())
     }
-}
-
-pub fn load_from_file(file_path: &str) -> Result<Config> {
-    let config: Config =
-        toml::from_str(&fs::read_to_string(file_path)?).expect("Failed parsing toml config");
-    Ok(config)
 }

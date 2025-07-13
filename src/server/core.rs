@@ -9,13 +9,13 @@ use std::thread;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
-use crate::config;
 use crate::server;
+use crate::config;
 
 async fn index(request: HttpRequest, body_mutex: Data<Arc<Mutex<String>>>) -> HttpResponse {
     let peer_addr = request.peer_addr();
     match peer_addr {
-        Some(addr) => debug!("Connection opened from {}", addr),
+        Some(addr) => debug!("Connection opened from {addr}"),
         None => debug!("Connection opened from unknown"),
     }
     // Wait until we have data

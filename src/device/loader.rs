@@ -1,17 +1,8 @@
 use anyhow::Result;
-use serde_json;
-
 use indexmap::IndexMap;
 
-use crate::padm_client::variables::{is_metric, unpack_variable, Variable};
-
-#[derive(Debug, Clone)]
-pub struct Device {
-    pub id: i64,
-    pub name: String,
-    pub device_type: String,
-    pub variables: Vec<Variable>,
-}
+use crate::device::Device;
+use crate::client::variables::{is_metric, unpack_variable};
 
 pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>> {
     let data = json["data"].as_array().unwrap();
@@ -20,7 +11,7 @@ pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>> {
     let items = data
         .iter()
         .filter_map(|i| i["attribute"].as_object())
-        .filter(|i| is_metric(&i));
+        .filter(|i| is_metric(i));
 
     for item in items {
         let id = item["device_id"].as_i64().unwrap();
