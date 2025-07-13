@@ -208,6 +208,8 @@ pub fn mutate_variable<'a>(
                 "Dehumidifying" => "4",
                 "Defrosting" => "5",
                 "Not Connected" => "6",
+                "Humidifying" => "7",
+                "Cooling and Humidifying" => "8",
                 _ => "6",
             },
             Some(HashMap::from([(String::from("mode"), value.to_string())]))
@@ -286,8 +288,8 @@ pub fn mutate_variable<'a>(
         ),
         "temperature_supported" => (
             match value {
+                "No" => "0",
                 "Yes" => "1",
-                "No" => "2",
                 _ => "1",
             },
             Some(HashMap::from([(String::from("supported"), value.to_string())]))

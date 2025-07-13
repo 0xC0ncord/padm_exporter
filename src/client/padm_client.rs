@@ -9,8 +9,7 @@ use crate::client::auth::AuthData;
 */
 pub struct PADMClient {
     client: reqwest::Client,
-    host: String,
-    scheme: String,
+    url: String,
     interval: u64,
     username: String,
     password: String,
@@ -18,8 +17,7 @@ pub struct PADMClient {
 }
 impl PADMClient {
     pub fn new(
-        host: &str,
-        scheme: &str,
+        url: &str,
         tls_insecure: bool,
         interval: u64,
         username: &str,
@@ -36,8 +34,7 @@ impl PADMClient {
 
         PADMClient {
             client,
-            host: host.to_string(),
-            scheme: scheme.to_string(),
+            url: url.to_string(),
             username: username.to_string(),
             password: password.to_string(),
             interval,
@@ -47,26 +44,26 @@ impl PADMClient {
     pub fn interval(&self) -> u64 {
         self.interval
     }
-    pub fn host(&self) -> &str {
-        &self.host
+    pub fn url(&self) -> &str {
+        &self.url
     }
     /// Log into the device and retrieve authentication data
     async fn authenticate(&self) -> Result<()> {
-        let request_url = format!("https://{}/api/oauth/token?grant_type=password", self.host);
+        let request_url = format!("https://{}/api/oauth/token?grant_type=password", self.url);
         let params = [("username", &self.username), ("password", &self.password)];
 
         let response = self.client.post(&request_url).form(&params).send().await;
 
         match response {
             Err(e) => {
-                error!("Authentication failed on endpoint {}: {}", self.host(), e);
+                error!("Authentication failed on endpoint {}: {}", self.url, e);
                 Err(anyhow!(e))
             }
             Ok(r) => match r.json().await {
                 Err(e) => {
                     error!(
                         "Malformed auth response from endpoint {}: {}",
-                        self.host(),
+                        self.url,
                         e
                     );
                     Err(anyhow!(e))
@@ -91,7 +88,7 @@ impl PADMClient {
     }
     /// Do an authenticated GET request
     pub async fn do_get(&self, path: &str) -> Result<reqwest::Response> {
-        let url = format!("{}://{}{}", self.scheme, self.host, path);
+        let url = format!("{}/{}", self.url, path);
 
         // Authenticate if never authenticated before
         if self.auth_data.borrow().is_empty() {

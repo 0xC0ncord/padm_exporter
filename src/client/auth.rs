@@ -14,8 +14,8 @@ impl AuthData {
             msg: String::new(),
         }
     }
+
     pub fn is_empty(&self) -> bool {
         self.access_token.is_empty() || self.refresh_token.is_empty() || self.msg.is_empty()
     }
 }
-

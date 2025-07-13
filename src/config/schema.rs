@@ -5,7 +5,7 @@ pub struct Config {
     ip: String,
     port: Option<u16>,
     log_level: Option<String>,
-    endpoints: Vec<Endpoint>,
+    targets: Vec<Target>,
 }
 impl Config {
     pub fn ip(&self) -> &str {
@@ -20,8 +20,8 @@ impl Config {
             None => "info"
         }
     }
-    pub fn endpoints(&self) -> &Vec<Endpoint> {
-        &self.endpoints
+    pub fn targets(&self) -> &Vec<Target> {
+        &self.targets
     }
 
     pub fn bind_address(&self) -> String {
@@ -30,27 +30,16 @@ impl Config {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Endpoint {
-    ip: String,
-    port: Option<u16>,
-    scheme: Option<String>,
+pub struct Target {
+    url: String,
     tls_insecure: Option<bool>,
     interval: Option<u64>,
     username: String,
     password: String,
 }
-impl Endpoint {
-    pub fn ip(&self) -> &str {
-        self.ip.as_str()
-    }
-    pub fn port(&self) -> u16 {
-        self.port.unwrap_or(443)
-    }
-    pub fn scheme(&self) -> &str {
-        match &self.scheme {
-            Some(s) => s,
-            None => "https",
-        }
+impl Target {
+    pub fn url(&self) -> &str {
+        self.url.as_str()
     }
     pub fn tls_insecure(&self) -> bool {
         self.tls_insecure.unwrap_or(false)
@@ -63,9 +52,5 @@ impl Endpoint {
     }
     pub fn password(&self) -> &str {
         &self.password
-    }
-
-    pub fn host(&self) -> String {
-        format!("{}:{}", self.ip(), self.port())
     }
 }

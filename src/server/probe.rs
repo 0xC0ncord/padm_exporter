@@ -104,14 +104,13 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
     let mut device_arcs = Vec::new();
 
     // Spawn client threads
-    for endpoint in config.endpoints() {
+    for target in config.targets() {
         let client = PADMClient::new(
-            endpoint.host().as_str(),
-            endpoint.scheme(),
-            endpoint.tls_insecure(),
-            endpoint.interval(),
-            endpoint.username(),
-            endpoint.password(),
+            target.url(),
+            target.tls_insecure(),
+            target.interval(),
+            target.username(),
+            target.password(),
         );
 
         let arc = Arc::new(Mutex::new(Vec::new()));
@@ -155,7 +154,7 @@ async fn client_run(
             }
             Err(e) => error!(
                 "Failed getting devices from client {}: {}",
-                &client.host(),
+                &client.url(),
                 e
             ),
         }
