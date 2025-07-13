@@ -319,7 +319,7 @@ pub fn unpack_variable(data: &Map<String, serde_json::Value>) -> Variable {
         match var.get(field) {
             Some(s) => s.to_string(),
             None => {
-                error!("Field '{}' not found in variable data!", field);
+                error!("Field '{field}' not found in variable data!");
                 String::new()
             }
         }
