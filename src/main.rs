@@ -20,10 +20,13 @@ async fn main() -> Result<()> {
 
     let config = config::load_from_file(&args.config)?;
 
-    let env = env_logger::Env::default()
-        .filter_or("MY_LOG_LEVEL", config.log_level())
-        .write_style_or("MY_LOG_LEVEL", config.log_level());
-    env_logger::init_from_env(env);
+    unsafe {
+        std::env::set_var(
+            "RUST_LOG",
+            std::env::var("RUST_LOG").unwrap_or(config.log_level().to_string()),
+        );
+    }
+    env_logger::init();
 
     server::run(config).await
 }
