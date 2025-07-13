@@ -1,19 +1,23 @@
 use anyhow::Result;
-use std::convert::Infallible;
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::server::conn::http1;
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
-use tokio::net::TcpListener;
 use prometheus::{Encoder, TextEncoder, gather};
+use std::convert::Infallible;
+use std::sync::Arc;
 use std::thread;
+use tokio::net::TcpListener;
 use tokio::runtime::Runtime;
 
-use crate::server;
+use crate::client::PADMClient;
 use crate::config;
+use crate::metrics::MetricsRegistry;
 
-async fn metrics_handler(_req: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
+async fn metrics_handler(
+    _req: Request<hyper::body::Incoming>,
+) -> Result<Response<Full<Bytes>>, Infallible> {
     let encoder = TextEncoder::new();
     let metric_families = gather();
     let mut buffer = Vec::new();
@@ -24,15 +28,29 @@ async fn metrics_handler(_req: Request<hyper::body::Incoming>) -> Result<Respons
 pub async fn run(config: config::Config) -> Result<()> {
     let listener = TcpListener::bind(config.bind_address()).await?;
 
-    // Spawn probe thread
-    thread::spawn(move || {
-        let rt = Runtime::new().unwrap();
-        rt.block_on(async move { server::probe::run(config).await });
-        loop {
-            thread::park();
-        }
-    });
+    let registry = Arc::new(MetricsRegistry::new());
 
+    // Spawn client threads
+    for target in config.targets() {
+        let mut client = PADMClient::new(
+            target.addr(),
+            target.url(),
+            target.tls_insecure(),
+            target.interval(),
+            target.username(),
+            target.password(),
+            registry.clone(),
+        );
+        thread::spawn(move || {
+            let rt = Runtime::new().unwrap();
+            rt.block_on(async move { client.run(thread::current()).await });
+            loop {
+                thread::park();
+            }
+        });
+    }
+
+    // Start metrics service
     loop {
         let (stream, _) = listener.accept().await?;
         let io = TokioIo::new(stream);

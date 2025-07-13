@@ -1,10 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
 
-mod config;
 mod client;
-mod device;
+mod config;
+mod metrics;
 mod server;
+mod target;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]

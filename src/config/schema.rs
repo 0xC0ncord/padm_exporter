@@ -17,7 +17,7 @@ impl Config {
     pub fn log_level(&self) -> &str {
         match &self.log_level {
             Some(s) => s,
-            None => "info"
+            None => "info",
         }
     }
     pub fn targets(&self) -> &Vec<Target> {
