@@ -1,3 +1,4 @@
+use anyhow::Result;
 use serde::Deserialize;
 use std::fs;
 
@@ -71,7 +72,7 @@ impl Endpoint {
     }
 }
 
-pub fn load_config_from_file(file_path: &str) -> Result<Config, std::io::Error> {
+pub fn load_from_file(file_path: &str) -> Result<Config> {
     let config: Config =
         toml::from_str(&fs::read_to_string(file_path)?).expect("Failed parsing toml config");
     Ok(config)

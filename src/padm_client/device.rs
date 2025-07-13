@@ -1,3 +1,4 @@
+use anyhow::Result;
 use serde_json;
 
 use indexmap::IndexMap;
@@ -12,7 +13,7 @@ pub struct Device {
     pub variables: Vec<Variable>,
 }
 
-pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>, std::io::Error> {
+pub fn load_all_from(json: &serde_json::Value) -> Result<Vec<Device>> {
     let data = json["data"].as_array().unwrap();
     // micro-optimization
     let mut devices: IndexMap<i64, Device> = IndexMap::with_capacity(data.len());

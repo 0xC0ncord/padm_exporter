@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use log::error;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -26,21 +27,20 @@ struct DeviceMetric {
     labels: HashMap<String, String>,
 }
 
-async fn get_devices_from(client: &PADMClient) -> Result<Vec<Device>, anyhow::Error> {
-    let response = client.do_get("/api/variables").await;
+async fn get_devices_from(client: &PADMClient) -> Result<Vec<Device>> {
+    let response = client.do_get("/api/variables").await
+        .map_err(|e| anyhow!(e));
     match response
-        .and_then(|r| r.error_for_status())
-        .map_err(|e| anyhow::Error::from(e))
     {
         Ok(r) => r.text().await.map_err(|e| e.into()).and_then(|s| {
-            let json = serde_json::from_str(&s).map_err(|e| anyhow::Error::from(e))?;
-            load_all_from(&json).map_err(|e| e.into())
+            let json = serde_json::from_str(&s).map_err(|e| anyhow!(e))?;
+            load_all_from(&json).map_err(|e| anyhow!(e))
         }),
         Err(e) => Err(e),
     }
 }
 
-fn format_output_from_devices(devices: &Vec<Device>) -> Result<String, std::io::Error> {
+fn format_output_from_devices(devices: &Vec<Device>) -> Result<String> {
     let mut body: String = String::new();
     let mut all_metrics: Vec<Metric> = Vec::new();
 
@@ -86,7 +86,7 @@ fn format_output_from_devices(devices: &Vec<Device>) -> Result<String, std::io::
             let mut inner: String = format!("device=\"{}\"", device_metric.device);
             for label in device_metric.labels {
                 let (k, v) = label;
-                inner = format!("{},{}=\"{}\"", inner, k, v);
+                inner = format!("{inner},{k}=\"{v}\"");
             }
             body.push_str(
                 format!(
@@ -138,7 +138,7 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
         }
         match format_output_from_devices(&all_devices) {
             Ok(output) => *body.lock().unwrap() = output,
-            Err(e) => error!("Failed formatting metrics output: {}", e),
+            Err(e) => error!("Failed formatting metrics output: {e}"),
         }
     }
 }

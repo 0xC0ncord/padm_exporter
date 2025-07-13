@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use log::error;
 use serde::Deserialize;
 use std::cell::RefCell;
@@ -68,7 +69,7 @@ impl PADMClient {
         &self.host
     }
     /// Log into the device and retrieve authentication data
-    async fn authenticate(&self) -> Result<(), reqwest::Error> {
+    async fn authenticate(&self) -> Result<()> {
         let request_url = format!("https://{}/api/oauth/token?grant_type=password", self.host);
         let params = [("username", &self.username), ("password", &self.password)];
 
@@ -77,7 +78,7 @@ impl PADMClient {
         match response {
             Err(e) => {
                 error!("Authentication failed on endpoint {}: {}", self.host(), e);
-                Err(e)
+                Err(anyhow!(e))
             }
             Ok(r) => match r.json().await {
                 Err(e) => {
@@ -86,7 +87,7 @@ impl PADMClient {
                         self.host(),
                         e
                     );
-                    Err(e)
+                    Err(anyhow!(e))
                 }
                 Ok(j) => {
                     self.auth_data.replace(j);
@@ -95,7 +96,7 @@ impl PADMClient {
             },
         }
     }
-    async fn raw_get(&self, url: &str) -> Result<reqwest::Response, reqwest::Error> {
+    async fn raw_get(&self, url: &str) -> Result<reqwest::Response> {
         self.client
             .get(url)
             .header(
@@ -104,9 +105,10 @@ impl PADMClient {
             )
             .send()
             .await
+            .map_err(|e| anyhow!(e))
     }
     /// Do an authenticated GET request
-    pub async fn do_get(&self, path: &str) -> Result<reqwest::Response, reqwest::Error> {
+    pub async fn do_get(&self, path: &str) -> Result<reqwest::Response> {
         let url = format!("{}://{}{}", self.scheme, self.host, path);
 
         // Authenticate if never authenticated before
@@ -125,7 +127,7 @@ impl PADMClient {
                         Ok(self.raw_get(&url).await?)
                     }
                     // Otherwise just return the error
-                    _ => Err(err),
+                    _ => Err(anyhow!(err)),
                 },
             },
             Err(err) => Err(err),

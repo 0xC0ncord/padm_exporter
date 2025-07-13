@@ -2,6 +2,7 @@ use actix_web::{
     web::{self, Data},
     App, HttpResponse, HttpRequest, HttpServer,
 };
+use anyhow::{anyhow, Result};
 use log::debug;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -24,7 +25,7 @@ async fn index(request: HttpRequest, body_mutex: Data<Arc<Mutex<String>>>) -> Ht
     HttpResponse::Ok().body((*body_mutex.lock().unwrap()).to_string())
 }
 
-pub async fn run(config: config::Config) -> std::io::Result<()> {
+pub async fn run(config: config::Config) -> Result<()> {
     // Create global body reference
     let body_mutex = Arc::new(Mutex::new(String::new()));
     let body_mutex_clone = body_mutex.clone();
@@ -40,12 +41,16 @@ pub async fn run(config: config::Config) -> std::io::Result<()> {
     });
 
     // Startup
-    HttpServer::new(move || {
+    if let Err(e) = HttpServer::new(move || {
         App::new()
             .app_data(Data::new(body_mutex.clone()))
             .route("/padm", web::get().to(index))
     })
     .bind(bind_address)?
     .run()
-    .await
+    .await {
+        Err(anyhow!(e))
+    } else {
+        Ok(())
+    }
 }

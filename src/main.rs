@@ -2,6 +2,7 @@ mod config;
 mod padm_client;
 mod server;
 
+use anyhow::Result;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -13,10 +14,10 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<()> {
     let args = Args::parse();
 
-    let config = config::load_config_from_file(&args.config).unwrap();
+    let config = config::load_from_file(&args.config)?;
 
     let env = env_logger::Env::default()
         .filter_or("MY_LOG_LEVEL", config.log_level())
