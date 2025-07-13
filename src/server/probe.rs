@@ -100,7 +100,7 @@ fn format_output_from_devices(devices: &Vec<Device>) -> Result<String> {
     Ok(body)
 }
 
-pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
+pub async fn run(config: config::Config) {
     let mut device_arcs = Vec::new();
 
     // Spawn client threads
@@ -137,7 +137,7 @@ pub async fn run(config: config::Config, body: Arc<Mutex<String>>) {
             all_devices.append(&mut arc.lock().unwrap().to_owned());
         }
         match format_output_from_devices(&all_devices) {
-            Ok(output) => *body.lock().unwrap() = output,
+            Ok(output) => (),
             Err(e) => error!("Failed formatting metrics output: {e}"),
         }
     }

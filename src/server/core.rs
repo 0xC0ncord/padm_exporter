@@ -1,56 +1,49 @@
-use actix_web::{
-    web::{self, Data},
-    App, HttpResponse, HttpRequest, HttpServer,
-};
-use anyhow::{anyhow, Result};
-use log::debug;
-use std::sync::{Arc, Mutex};
+use anyhow::Result;
+use std::convert::Infallible;
+use http_body_util::Full;
+use hyper::body::Bytes;
+use hyper::server::conn::http1;
+use hyper::{Request, Response};
+use hyper_util::rt::TokioIo;
+use tokio::net::TcpListener;
+use prometheus::{Encoder, TextEncoder, gather};
 use std::thread;
-use std::time::Duration;
 use tokio::runtime::Runtime;
 
 use crate::server;
 use crate::config;
 
-async fn index(request: HttpRequest, body_mutex: Data<Arc<Mutex<String>>>) -> HttpResponse {
-    let peer_addr = request.peer_addr();
-    match peer_addr {
-        Some(addr) => debug!("Connection opened from {addr}"),
-        None => debug!("Connection opened from unknown"),
-    }
-    // Wait until we have data
-    if (*body_mutex.lock().unwrap()).is_empty() {
-        async_std::task::sleep(Duration::from_millis(1000)).await;
-    }
-    HttpResponse::Ok().body((*body_mutex.lock().unwrap()).to_string())
+async fn metrics_handler(_req: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
+    let encoder = TextEncoder::new();
+    let metric_families = gather();
+    let mut buffer = Vec::new();
+    encoder.encode(&metric_families, &mut buffer).unwrap();
+    Ok(Response::new(Full::new(Bytes::from(buffer))))
 }
 
 pub async fn run(config: config::Config) -> Result<()> {
-    // Create global body reference
-    let body_mutex = Arc::new(Mutex::new(String::new()));
-    let body_mutex_clone = body_mutex.clone();
-    let bind_address = config.bind_address();
+    let listener = TcpListener::bind(config.bind_address()).await?;
 
     // Spawn probe thread
     thread::spawn(move || {
         let rt = Runtime::new().unwrap();
-        rt.block_on(async move { server::probe::run(config, body_mutex_clone).await });
+        rt.block_on(async move { server::probe::run(config).await });
         loop {
             thread::park();
         }
     });
 
-    // Startup
-    if let Err(e) = HttpServer::new(move || {
-        App::new()
-            .app_data(Data::new(body_mutex.clone()))
-            .route("/padm", web::get().to(index))
-    })
-    .bind(bind_address)?
-    .run()
-    .await {
-        Err(anyhow!(e))
-    } else {
-        Ok(())
+    loop {
+        let (stream, _) = listener.accept().await?;
+        let io = TokioIo::new(stream);
+
+        tokio::task::spawn(async move {
+            if let Err(e) = http1::Builder::new()
+                .serve_connection(io, hyper::service::service_fn(metrics_handler))
+                .await
+            {
+                log::error!("Error serving connection: {e:?}");
+            }
+        });
     }
 }
