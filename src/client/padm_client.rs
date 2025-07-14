@@ -25,6 +25,7 @@ pub struct PADMClient {
     registry: Arc<MetricsRegistry>,
 }
 impl PADMClient {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         host: &str,
         addr: String,
