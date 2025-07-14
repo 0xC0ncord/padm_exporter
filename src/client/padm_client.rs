@@ -14,6 +14,7 @@ use crate::target::ApiResponse;
 */
 pub struct PADMClient {
     client: reqwest::Client,
+    host: String,
     addr: String,
     url: String,
     interval: u64,
@@ -25,6 +26,7 @@ pub struct PADMClient {
 }
 impl PADMClient {
     pub fn new(
+        host: &str,
         addr: String,
         url: String,
         tls_insecure: bool,
@@ -44,6 +46,7 @@ impl PADMClient {
 
         PADMClient {
             client,
+            host: host.to_string(),
             addr,
             url: url.to_string(),
             username: username.to_string(),
@@ -59,7 +62,7 @@ impl PADMClient {
     }
     /// Log into the target and retrieve authentication data
     async fn authenticate(&self) -> Result<()> {
-        let request_url = format!("https://{}/api/oauth/token?grant_type=password", self.url);
+        let request_url = self.url.to_string() + "/api/oauth/token?grant_type=password";
         let params = [("username", &self.username), ("password", &self.password)];
 
         let response = self.client.post(&request_url).form(&params).send().await;
@@ -94,7 +97,7 @@ impl PADMClient {
     }
     /// Do an authenticated GET request
     async fn do_get(&self, path: &str) -> Result<reqwest::Response> {
-        let url = format!("{}/{}", self.url, path);
+        let url = self.url.to_string() + path;
 
         // Authenticate if never authenticated before
         if self.auth_data.borrow().is_empty() {
@@ -135,25 +138,42 @@ impl PADMClient {
             let attr = var.attributes.clone();
             if let Some(metric) = PADMMetric::from_label(&attr.label) {
                 let key = metric.to_metric_key();
-                let value: f64 = match attr.raw_value.parse() {
-                    Ok(v) => v,
-                    Err(_) => {
-                        log::warn!(
-                            "Could not parse value '{}' for label '{}'",
-                            attr.raw_value,
-                            attr.label
-                        );
-                        continue;
+
+                if key.is_enum && !attr.enum_values.is_empty() {
+                    let current_value = attr.value.as_str();
+                    for variant in &attr.enum_values {
+                        let metric_value = if variant.name == current_value {
+                            1.0
+                        } else {
+                            0.0
+                        };
+                        let label_refs = [&*self.host, &*attr.device_name, &*variant.name];
+                        if let Err(e) = self.registry.update_metric(&key, &label_refs, metric_value)
+                        {
+                            log::error!("Failed to update or register metric {}: {}", key.name, e);
+                        }
                     }
-                };
-                let mut label_values = vec![attr.device_name];
-                if key.labels.len() > 1 {
-                    label_values.push(attr.value);
-                }
-                let label_refs: Vec<&str> = label_values.iter().map(String::as_str).collect();
-                if let Err(e) = self.registry.update_metric(&key, &label_refs, value) {
-                    log::error!("Failed to update or register metric {}: {}", key.name, e);
-                    continue;
+                } else {
+                    let raw_value: f64 = match attr.get_raw() {
+                        Ok(v) => v,
+                        Err(_) => {
+                            log::warn!(
+                                "Could not parse value '{}' for label '{}'",
+                                attr.raw_value,
+                                attr.label
+                            );
+                            continue;
+                        }
+                    };
+
+                    let label_refs: Vec<&str> = if key.labels.len() > 2 {
+                        vec![&*self.host, &*attr.device_name, &*attr.value]
+                    } else {
+                        vec![&*self.host, &*attr.device_name]
+                    };
+                    if let Err(e) = self.registry.update_metric(&key, &label_refs, raw_value) {
+                        log::error!("Failed to update or register metric {}: {}", key.name, e);
+                    }
                 }
             }
         }

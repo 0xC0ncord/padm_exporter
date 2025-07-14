@@ -32,7 +32,7 @@ impl Config {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Target {
     host: String,
-    port: Option<String>,
+    port: Option<u16>,
     scheme: Option<String>,
     tls_insecure: Option<bool>,
     interval: Option<u64>,
@@ -40,6 +40,9 @@ pub struct Target {
     password: String,
 }
 impl Target {
+    pub fn host(&self) -> &str {
+        &self.host
+    }
     pub fn addr(&self) -> String {
         let mut addr = self.host.to_string();
         if let Some(port) = &self.port {

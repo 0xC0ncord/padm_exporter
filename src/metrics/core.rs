@@ -8,6 +8,7 @@ pub struct MetricKey {
     pub name: String,
     pub help: String,
     pub labels: Vec<String>,
+    pub is_enum: bool,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -35,113 +36,134 @@ pub enum PADMMetric {
 }
 impl PADMMetric {
     pub fn to_metric_key(&self) -> MetricKey {
-        let (name, help, labels) = match self {
+        let (name, help, labels, is_enum) = match self {
             PADMMetric::FirmwareVersion => (
                 "firmware_version",
                 "Device firmware version.",
-                vec!["device".into(), "version".into()],
+                vec!["target".into(), "device".into(), "version".into()],
+                false,
             ),
             PADMMetric::OperatingMode => (
                 "operating_mode",
                 "Device operating mode.",
-                vec!["device".into(), "mode".into()],
+                vec!["target".into(), "device".into(), "mode".into()],
+                true,
             ),
             PADMMetric::LcdDisplayUnits => (
                 "lcd_display_units",
                 "Units displayed on the LCD screen.",
-                vec!["device".into(), "mode".into()],
+                vec!["target".into(), "device".into(), "mode".into()],
+                true,
             ),
             PADMMetric::DehumidifyingMode => (
                 "dehumidifying_mode",
                 "Device dehumidifying mode.",
-                vec!["device".into(), "mode".into()],
+                vec!["target".into(), "device".into(), "mode".into()],
+                true,
             ),
             PADMMetric::WaterFault => (
                 "water_fault",
                 "Device water fault status.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::AutomaticFanSpeedState => (
                 "automatic_fan_speed_state",
                 "Device automatic fan speed status.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::FanSpeed => (
                 "fan_speed",
                 "Device fan speed setting.",
-                vec!["device".into(), "mode".into()],
+                vec!["target".into(), "device".into(), "mode".into()],
+                true,
             ),
             PADMMetric::FanAlwaysOn => (
                 "fan_always_on",
                 "Device fan always on setting.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::QuietMode => (
                 "quiet_mode",
                 "Device quiet mode setting.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::SetPointTemperature => (
                 "set_point_temperature",
                 "Set point temperature in celsius.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::RemoteTemperatureSensorState => (
                 "remote_temperature_sensor_state",
                 "Remote temperature sensor state.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::ReturnAirTemperature => (
                 "return_air_temperature",
                 "Temperature of the return air in celsius.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::RemoteSetPointTemperature => (
                 "remote_set_point_temperature",
                 "Set point temperature of the remote sensor.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::Temperature => (
                 "temperature",
                 "Current detected temperature.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::TemperatureSupported => (
                 "temperature_supported",
                 "Whether the device supports temperature sensing.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::HumiditySupported => (
                 "humidity_supported",
                 "Whether the device supports humidity sensing.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::ContactInputCount => (
                 "contact_input_count",
                 "GPIO input contact counter.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::ContactOutputCount => (
                 "contact_output_count",
                 "GPIO output contact counter.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::TempLowCritThreshold => (
                 "temp_low_crit_threshold",
                 "Critically low temperature.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
             PADMMetric::TempHighCritThreshold => (
                 "temp_high_crit_threshold",
                 "Critically high temperature.",
-                vec!["device".into()],
+                vec!["target".into(), "device".into()],
+                false,
             ),
         };
 
         MetricKey {
-            name: name.to_string(),
+            name: "padm_".to_string() + name,
             help: help.to_string(),
             labels,
+            is_enum,
         }
     }
     pub fn from_label(label: &str) -> Option<Self> {
@@ -194,7 +216,7 @@ impl MetricsRegistry {
                     metrics.insert(key.clone(), g);
                     Ok(())
                 })
-                .context(format!("Failed to register metric {}", key.name))?;
+                .context(format!("Failed to register metric {}", &key.name))?;
         }
 
         if let Some(g) = metrics.get(key) {
