@@ -161,11 +161,11 @@ impl PADMClient {
         Ok(())
     }
     async fn write_metric(&self, key: &MetricKey, label_refs: &Vec<&str>, raw_value: f64) {
-        if let Err(e) =
-            self.registry
-                .write()
-                .await
-                .update_metric(key, label_refs, raw_value)
+        if let Err(e) = self
+            .registry
+            .write()
+            .await
+            .update_metric(key, label_refs, raw_value)
         {
             log::error!("Failed to update or register metric {}: {}", key.name, e);
         }
@@ -219,7 +219,12 @@ impl PADMClient {
                         vec![&*attr.device_name]
                     };
 
-                    log::debug!("{}: updating metric {} with value {}", self.addr, key.name, raw_value);
+                    log::debug!(
+                        "{}: updating metric {} with value {}",
+                        self.addr,
+                        key.name,
+                        raw_value
+                    );
                     self.write_metric(&key, &label_refs, raw_value).await;
                 }
             } else {
@@ -229,15 +234,28 @@ impl PADMClient {
 
         // Update tracked device status metrics
         for device in self.tracked_devices.iter() {
-            let found = response_data.data.iter().any(|var| var.attributes.device_name == *device);
+            let found = response_data
+                .data
+                .iter()
+                .any(|var| var.attributes.device_name == *device);
 
-            log::debug!("{}: updating tracked device metric {} with value {}", self.addr, device, found);
+            log::debug!(
+                "{}: updating tracked device metric {} with value {}",
+                self.addr,
+                device,
+                found
+            );
 
             if let Some(metric) = PADMMetric::from_label("Device Up") {
                 let key = metric.to_metric_key();
-                self.write_metric(&key, &vec![device], f64::from(found)).await;
+                self.write_metric(&key, &vec![device], f64::from(found))
+                    .await;
             } else {
-                log::error!("{}: failed updating tracked device metric {}", self.addr, device);
+                log::error!(
+                    "{}: failed updating tracked device metric {}",
+                    self.addr,
+                    device
+                );
             }
         }
 
