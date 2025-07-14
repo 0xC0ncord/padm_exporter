@@ -23,6 +23,7 @@ pub struct PADMClient {
     api_response: RwLock<Option<ApiResponse>>,
     registry: RwLock<MetricsRegistry>,
     ready: Notify,
+    probe: Notify,
 }
 impl PADMClient {
     #[allow(clippy::too_many_arguments)]
@@ -56,10 +57,14 @@ impl PADMClient {
             api_response: RwLock::new(None),
             registry: RwLock::new(MetricsRegistry::new()),
             ready: Notify::new(),
+            probe: Notify::new(),
         }
     }
     pub fn interval(&self) -> u64 {
         self.interval
+    }
+    pub fn is_manual(&self) -> bool {
+        self.interval == 0
     }
     pub fn registry(&self) -> &RwLock<MetricsRegistry> {
         &self.registry
@@ -67,8 +72,11 @@ impl PADMClient {
     pub fn ready(&self) -> &Notify {
         &self.ready
     }
+    pub fn probe(&self) -> &Notify {
+        &self.probe
+    }
     pub async fn is_ready(&self) -> bool {
-        !self.registry.read().await.registry.gather().is_empty()
+        !self.registry.read().await.registry.gather().is_empty() && !self.is_manual()
     }
     /// Log into the target and retrieve authentication data
     async fn authenticate(&self) -> Result<()> {
@@ -137,7 +145,7 @@ impl PADMClient {
         }
     }
     /// Probe the device
-    async fn probe(&self) -> Result<()> {
+    async fn do_probe(&self) -> Result<()> {
         let mut api_data = self.api_response.write().await;
         let response_data: ApiResponse = self
             .do_get("/api/variables")
@@ -240,13 +248,21 @@ impl PADMClient {
     /// Run this client
     pub async fn run(&self, main_thread: Thread) {
         loop {
-            if let Err(e) = self.probe().await {
+            if self.is_manual() {
+                self.probe.notified().await
+            }
+
+            if let Err(e) = self.do_probe().await {
                 log::error!("Error from client {}: {e}", self.addr);
             } else {
                 self.update_metrics().await;
             }
+
             main_thread.unpark();
-            async_std::task::sleep(Duration::from_secs(self.interval())).await;
+
+            if !self.is_manual() {
+                async_std::task::sleep(Duration::from_secs(self.interval())).await;
+            }
         }
     }
 }

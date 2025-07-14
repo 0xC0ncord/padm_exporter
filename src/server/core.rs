@@ -66,7 +66,12 @@ async fn metrics_handler(
     let encoder = TextEncoder::new();
     let mut buffer = Vec::new();
 
-    // Make sure the client is ready first
+    // If the probing is manual, tell the client to do it
+    if client.is_manual() {
+        client.probe().notify_waiters();
+    }
+
+    // Wait until the client is ready
     let is_ready = client.is_ready().await;
     if !is_ready {
         client.ready().notified().await;
