@@ -1,9 +1,8 @@
 use anyhow::{Context, Result, anyhow};
 use log::error;
-use std::cell::RefCell;
-use std::sync::Arc;
 use std::thread::Thread;
 use std::time::Duration;
+use tokio::sync::RwLock;
 
 use crate::client::auth::AuthData;
 use crate::metrics::{MetricsRegistry, PADMMetric};
@@ -14,27 +13,24 @@ use crate::target::ApiResponse;
 */
 pub struct PADMClient {
     client: reqwest::Client,
-    host: String,
     addr: String,
     url: String,
     interval: u64,
     username: String,
     password: String,
-    auth_data: RefCell<AuthData>,
-    api_response: ApiResponse,
-    registry: Arc<MetricsRegistry>,
+    auth_data: RwLock<AuthData>,
+    api_response: RwLock<ApiResponse>,
+    registry: RwLock<MetricsRegistry>,
 }
 impl PADMClient {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        host: &str,
         addr: String,
         url: String,
         tls_insecure: bool,
         interval: u64,
         username: &str,
         password: &str,
-        registry: Arc<MetricsRegistry>,
     ) -> PADMClient {
         let mut client_builder = reqwest::Client::builder();
         // Disable SSL verification if asked
@@ -47,19 +43,21 @@ impl PADMClient {
 
         PADMClient {
             client,
-            host: host.to_string(),
             addr,
             url: url.to_string(),
             username: username.to_string(),
             password: password.to_string(),
             interval,
-            auth_data: RefCell::new(AuthData::new()),
-            api_response: ApiResponse::new(),
-            registry,
+            auth_data: RwLock::new(AuthData::new()),
+            api_response: RwLock::new(ApiResponse::new()),
+            registry: RwLock::new(MetricsRegistry::new()),
         }
     }
     pub fn interval(&self) -> u64 {
         self.interval
+    }
+    pub fn registry(&self) -> &RwLock<MetricsRegistry> {
+        &self.registry
     }
     /// Log into the target and retrieve authentication data
     async fn authenticate(&self) -> Result<()> {
@@ -79,7 +77,8 @@ impl PADMClient {
                     Err(anyhow!(e))
                 }
                 Ok(j) => {
-                    self.auth_data.replace(j);
+                    let mut auth_data = self.auth_data.write().await;
+                    *auth_data = j;
                     Ok(())
                 }
             },
@@ -90,7 +89,7 @@ impl PADMClient {
             .get(url)
             .header(
                 reqwest::header::AUTHORIZATION,
-                format!("Bearer {}", &self.auth_data.borrow().access_token),
+                format!("Bearer {}", self.auth_data.read().await.access_token),
             )
             .send()
             .await
@@ -101,7 +100,7 @@ impl PADMClient {
         let url = self.url.to_string() + path;
 
         // Authenticate if never authenticated before
-        if self.auth_data.borrow().is_empty() {
+        if self.auth_data.read().await.is_empty() {
             self.authenticate().await?;
         }
 
@@ -123,19 +122,21 @@ impl PADMClient {
         }
     }
     /// Probe the device
-    async fn probe(&mut self) -> Result<()> {
-        self.api_response = self
+    async fn probe(&self) -> Result<()> {
+        let mut api_data = self.api_response.write().await;
+        let response_data: ApiResponse = self
             .do_get("/api/variables")
             .await
             .context("Network error")?
             .json()
             .await
             .context("Failed to deserialize JSON")?;
+        *api_data = response_data;
         Ok(())
     }
     /// Update metrics from the ApiResponse
-    async fn update_metrics(&mut self) {
-        for var in self.api_response.data.iter() {
+    async fn update_metrics(&self) {
+        for var in self.api_response.read().await.data.iter() {
             let attr = var.attributes.clone();
             if let Some(metric) = PADMMetric::from_label(&attr.label) {
                 let key = metric.to_metric_key();
@@ -148,8 +149,8 @@ impl PADMClient {
                         } else {
                             0.0
                         };
-                        let label_refs = [&*self.host, &*attr.device_name, &*variant.name];
-                        if let Err(e) = self.registry.update_metric(&key, &label_refs, metric_value)
+                        let label_refs = [&*attr.device_name, &*variant.name];
+                        if let Err(e) = self.registry.write().await.update_metric(&key, &label_refs, metric_value)
                         {
                             log::error!("Failed to update or register metric {}: {}", key.name, e);
                         }
@@ -167,12 +168,12 @@ impl PADMClient {
                         }
                     };
 
-                    let label_refs: Vec<&str> = if key.labels.len() > 2 {
-                        vec![&*self.host, &*attr.device_name, &*attr.value]
+                    let label_refs: Vec<&str> = if key.labels.len() > 1 {
+                        vec![&*attr.device_name, &*attr.value]
                     } else {
-                        vec![&*self.host, &*attr.device_name]
+                        vec![&*attr.device_name]
                     };
-                    if let Err(e) = self.registry.update_metric(&key, &label_refs, raw_value) {
+                    if let Err(e) = self.registry.write().await.update_metric(&key, &label_refs, raw_value) {
                         log::error!("Failed to update or register metric {}: {}", key.name, e);
                     }
                 }
@@ -180,7 +181,7 @@ impl PADMClient {
         }
     }
     /// Run this client
-    pub async fn run(&mut self, main_thread: Thread) {
+    pub async fn run(&self, main_thread: Thread) {
         loop {
             if let Err(e) = self.probe().await {
                 log::error!("Error from client {}: {e}", self.addr);

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use http_body_util::{BodyExt, combinators::BoxBody};
 use http_body_util::{Empty, Full};
 use hyper::body::Bytes;
@@ -6,7 +6,8 @@ use hyper::server::conn::http1;
 use hyper::{Method, StatusCode};
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
-use prometheus::{Encoder, TextEncoder, proto::MetricFamily};
+use prometheus::{Encoder, TextEncoder};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 use tokio::net::TcpListener;
@@ -15,7 +16,6 @@ use url::form_urlencoded;
 
 use crate::client::PADMClient;
 use crate::config;
-use crate::metrics::MetricsRegistry;
 
 fn empty() -> BoxBody<Bytes, hyper::Error> {
     Empty::<Bytes>::new()
@@ -30,7 +30,7 @@ fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {
 
 async fn metrics_handler(
     req: Request<hyper::body::Incoming>,
-    registry: Arc<MetricsRegistry>,
+    clients: HashMap<String, Arc<PADMClient>>,
 ) -> Result<Response<BoxBody<Bytes, hyper::Error>>> {
     // Only allow GET requests
     if req.method() != Method::GET {
@@ -59,34 +59,14 @@ async fn metrics_handler(
         }
     };
 
+    let client = clients.get(&target).context("Requested target {} not found.")?;
+
     let encoder = TextEncoder::new();
     let mut buffer = Vec::new();
 
-    // Get all metric families from the registry
-    let all_families = registry.registry.gather();
-    // Filter down metrics to only the target given
-    let filtered_families: Vec<MetricFamily> = all_families
-        .into_iter()
-        .filter_map(|mut family| {
-            let original_metrics = family.get_metric().to_vec();
-            let filtered_metrics: Vec<_> = original_metrics
-                .into_iter()
-                .filter(|m| {
-                    m.get_label()
-                        .iter()
-                        .any(|l| l.name() == "target" && l.value() == target)
-                })
-                .collect();
-            if filtered_metrics.is_empty() {
-                None
-            } else {
-                family.metric.clear();
-                family.mut_metric().extend(filtered_metrics);
-                Some(family)
-            }
-        })
-        .collect();
-    encoder.encode(&filtered_families, &mut buffer).unwrap();
+    // Get all metrics from the registry
+    let metrics = client.registry().read().await.registry.gather();
+    encoder.encode(&metrics, &mut buffer).unwrap();
 
     // Send it
     Ok(Response::new(full(Bytes::from(buffer)).boxed()))
@@ -95,23 +75,27 @@ async fn metrics_handler(
 pub async fn run(config: config::Config) -> Result<()> {
     let listener = TcpListener::bind(config.bind_address()).await?;
 
-    let registry = Arc::new(MetricsRegistry::new());
+    let mut clients = HashMap::new();
 
     // Spawn client threads
     for target in config.targets() {
-        let mut client = PADMClient::new(
-            target.host(),
+        let client = PADMClient::new(
             target.addr(),
             target.url(),
             target.tls_insecure(),
             target.interval(),
             target.username(),
             target.password(),
-            registry.clone(),
         );
+        let client_arc = Arc::new(client);
+        clients.insert(target.host().to_string(), client_arc.clone());
+
+        let client_thread_arc = client_arc.clone();
         thread::spawn(move || {
             let rt = Runtime::new().unwrap();
-            rt.block_on(async move { client.run(thread::current()).await });
+            rt.block_on(async move {
+                client_thread_arc.run(thread::current()).await
+            });
             loop {
                 thread::park();
             }
@@ -122,15 +106,14 @@ pub async fn run(config: config::Config) -> Result<()> {
     loop {
         let (stream, _) = listener.accept().await?;
         let io = TokioIo::new(stream);
-
-        let registry_clone = registry.clone();
+        let clients_clone = clients.clone();
 
         tokio::task::spawn(async move {
             if let Err(e) = http1::Builder::new()
                 .serve_connection(
                     io,
                     hyper::service::service_fn(move |req| {
-                        metrics_handler(req, registry_clone.clone())
+                        metrics_handler(req, clients_clone.clone())
                     }),
                 )
                 .await
