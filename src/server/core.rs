@@ -66,6 +66,12 @@ async fn metrics_handler(
     let encoder = TextEncoder::new();
     let mut buffer = Vec::new();
 
+    // Make sure the client is ready first
+    let is_ready = client.is_ready().await;
+    if !is_ready {
+        client.ready().notified().await;
+    }
+
     // Get all metrics from the registry
     let metrics = client.registry().read().await.registry.gather();
     encoder.encode(&metrics, &mut buffer).unwrap();

@@ -5,11 +5,6 @@ use serde::Deserialize;
 pub struct ApiResponse {
     pub data: Vec<Variable>,
 }
-impl ApiResponse {
-    pub fn new() -> ApiResponse {
-        ApiResponse { data: Vec::new() }
-    }
-}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Variable {

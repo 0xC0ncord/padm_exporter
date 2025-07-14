@@ -2,7 +2,7 @@ use anyhow::{Context, Result, anyhow};
 use log::error;
 use std::thread::Thread;
 use std::time::Duration;
-use tokio::sync::RwLock;
+use tokio::sync::{Notify, RwLock};
 
 use crate::client::auth::AuthData;
 use crate::metrics::{MetricsRegistry, PADMMetric};
@@ -19,8 +19,9 @@ pub struct PADMClient {
     username: String,
     password: String,
     auth_data: RwLock<AuthData>,
-    api_response: RwLock<ApiResponse>,
+    api_response: RwLock<Option<ApiResponse>>,
     registry: RwLock<MetricsRegistry>,
+    ready: Notify,
 }
 impl PADMClient {
     #[allow(clippy::too_many_arguments)]
@@ -49,8 +50,9 @@ impl PADMClient {
             password: password.to_string(),
             interval,
             auth_data: RwLock::new(AuthData::new()),
-            api_response: RwLock::new(ApiResponse::new()),
+            api_response: RwLock::new(None),
             registry: RwLock::new(MetricsRegistry::new()),
+            ready: Notify::new(),
         }
     }
     pub fn interval(&self) -> u64 {
@@ -58,6 +60,12 @@ impl PADMClient {
     }
     pub fn registry(&self) -> &RwLock<MetricsRegistry> {
         &self.registry
+    }
+    pub fn ready(&self) -> &Notify {
+        &self.ready
+    }
+    pub async fn is_ready(&self) -> bool {
+        !self.registry.read().await.registry.gather().is_empty()
     }
     /// Log into the target and retrieve authentication data
     async fn authenticate(&self) -> Result<()> {
@@ -131,12 +139,15 @@ impl PADMClient {
             .json()
             .await
             .context("Failed to deserialize JSON")?;
-        *api_data = response_data;
+        *api_data = Some(response_data);
         Ok(())
     }
     /// Update metrics from the ApiResponse
     async fn update_metrics(&self) {
-        for var in self.api_response.read().await.data.iter() {
+        let guard = self.api_response.read().await;
+        let do_notify = !self.is_ready().await;
+        let response_data = guard.as_ref().unwrap();
+        for var in response_data.data.iter() {
             let attr = var.attributes.clone();
             if let Some(metric) = PADMMetric::from_label(&attr.label) {
                 let key = metric.to_metric_key();
@@ -186,6 +197,10 @@ impl PADMClient {
                     }
                 }
             }
+        }
+
+        if do_notify {
+            self.ready.notify_waiters();
         }
     }
     /// Run this client
