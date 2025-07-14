@@ -168,7 +168,7 @@ impl PADMClient {
                         } else {
                             0.0
                         };
-                        let label_refs = [&*attr.device_name, &*variant.name];
+                        let label_refs = [&*attr.device_name, &*variant.name.to_lowercase()];
                         if let Err(e) = self.registry.write().await.update_metric(
                             &key,
                             &label_refs,
@@ -190,8 +190,9 @@ impl PADMClient {
                         }
                     };
 
+                    let value = &*attr.value.to_lowercase();
                     let label_refs: Vec<&str> = if key.labels.len() > 1 {
-                        vec![&*attr.device_name, &*attr.value]
+                        vec![&*attr.device_name, value]
                     } else {
                         vec![&*attr.device_name]
                     };
