@@ -231,6 +231,14 @@ impl PADMMetric {
             _ => return None,
         })
     }
+    pub fn is_ignored(label: &str) -> bool {
+        matches!(
+            label,
+            "LCD Display Details"
+                | "Hardware Configuration"
+                | "Temperature (C) Thresholds and Bounds"
+        )
+    }
 }
 
 pub struct MetricsRegistry {

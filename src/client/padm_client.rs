@@ -179,6 +179,12 @@ impl PADMClient {
         let response_data = guard.as_ref().unwrap();
         for var in response_data.data.iter() {
             let attr = var.attributes.clone();
+
+            if PADMMetric::is_ignored(&attr.label) {
+                log::debug!("{}: variable '{}' ignored", self.addr, attr.label);
+                continue;
+            }
+
             if let Some(metric) = PADMMetric::from_label(&attr.label) {
                 let key = metric.to_metric_key();
 
