@@ -150,8 +150,11 @@ impl PADMClient {
                             0.0
                         };
                         let label_refs = [&*attr.device_name, &*variant.name];
-                        if let Err(e) = self.registry.write().await.update_metric(&key, &label_refs, metric_value)
-                        {
+                        if let Err(e) = self.registry.write().await.update_metric(
+                            &key,
+                            &label_refs,
+                            metric_value,
+                        ) {
                             log::error!("Failed to update or register metric {}: {}", key.name, e);
                         }
                     }
@@ -173,7 +176,12 @@ impl PADMClient {
                     } else {
                         vec![&*attr.device_name]
                     };
-                    if let Err(e) = self.registry.write().await.update_metric(&key, &label_refs, raw_value) {
+                    if let Err(e) =
+                        self.registry
+                            .write()
+                            .await
+                            .update_metric(&key, &label_refs, raw_value)
+                    {
                         log::error!("Failed to update or register metric {}: {}", key.name, e);
                     }
                 }

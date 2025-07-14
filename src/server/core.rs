@@ -59,7 +59,9 @@ async fn metrics_handler(
         }
     };
 
-    let client = clients.get(&target).context("Requested target {} not found.")?;
+    let client = clients
+        .get(&target)
+        .context("Requested target {} not found.")?;
 
     let encoder = TextEncoder::new();
     let mut buffer = Vec::new();
@@ -93,9 +95,7 @@ pub async fn run(config: config::Config) -> Result<()> {
         let client_thread_arc = client_arc.clone();
         thread::spawn(move || {
             let rt = Runtime::new().unwrap();
-            rt.block_on(async move {
-                client_thread_arc.run(thread::current()).await
-            });
+            rt.block_on(async move { client_thread_arc.run(thread::current()).await });
             loop {
                 thread::park();
             }
