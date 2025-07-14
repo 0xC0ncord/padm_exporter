@@ -87,6 +87,7 @@ async fn metrics_handler(
 
 pub async fn run(config: config::Config) -> Result<()> {
     let listener = TcpListener::bind(config.bind_address()).await?;
+    log::debug!("Listening on {}:{}", config.ip(), config.port());
 
     let mut clients = HashMap::new();
 
@@ -101,6 +102,8 @@ pub async fn run(config: config::Config) -> Result<()> {
             target.password(),
             target.tracked_devices().clone(),
         );
+        log::debug!("Creating client for {}", target.addr());
+
         let client_arc = Arc::new(client);
         clients.insert(target.host().to_string(), client_arc.clone());
 
