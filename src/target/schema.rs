@@ -20,7 +20,7 @@ pub struct Attributes {
     pub enum_values: Vec<EnumValue>,
 }
 impl Attributes {
-    pub fn get_raw(&self) -> Result<f64> {
+    pub fn parse_raw(&self) -> Result<f64> {
         match self.label.as_str() {
             "Firmware Version" => Ok(1.0),
             _ => self

@@ -190,17 +190,17 @@ impl PADMClient {
                         } else {
                             0.0
                         };
-                        let label_refs = [&*attr.device_name, &*variant.name.to_lowercase()];
+                        let label_refs = [&*attr.device_name, &sanitize_label(variant.name.to_owned())];
                         if let Err(e) = self.registry.write().await.update_metric(
                             &key,
                             &label_refs,
                             metric_value,
                         ) {
-                            log::error!("Failed to update or register metric {}: {}", key.name, e);
+                            log::error!("Failed to update or register metric '{}': {}", key.name, e);
                         }
                     }
                 } else {
-                    let raw_value: f64 = match attr.get_raw() {
+                    let raw_value: f64 = match attr.parse_raw() {
                         Ok(v) => v,
                         Err(_) => {
                             log::warn!(
@@ -212,7 +212,7 @@ impl PADMClient {
                         }
                     };
 
-                    let value = &*attr.value.to_lowercase();
+                    let value = &sanitize_label(attr.value);
                     let label_refs: Vec<&str> = if key.labels.len() > 1 {
                         vec![&*attr.device_name, value]
                     } else {
@@ -220,7 +220,7 @@ impl PADMClient {
                     };
 
                     log::debug!(
-                        "{}: updating metric {} with value {}",
+                        "{}: updating metric '{}' with value {}",
                         self.addr,
                         key.name,
                         raw_value
@@ -228,19 +228,19 @@ impl PADMClient {
                     self.write_metric(&key, &label_refs, raw_value).await;
                 }
             } else {
-                log::debug!("{}: variable {} unmapped", self.addr, var.attributes.label);
+                log::debug!("{}: variable '{}' left unmapped", self.addr, var.attributes.label);
             }
         }
 
         // Update tracked device status metrics
         for device in self.tracked_devices.iter() {
-            let found = response_data
+            let found = f64::from(response_data
                 .data
                 .iter()
-                .any(|var| var.attributes.device_name == *device);
+                .any(|var| var.attributes.device_name == *device));
 
             log::debug!(
-                "{}: updating tracked device metric {} with value {}",
+                "{}: updating tracked device '{}' metric with value {}",
                 self.addr,
                 device,
                 found
@@ -248,11 +248,11 @@ impl PADMClient {
 
             if let Some(metric) = PADMMetric::from_label("Device Up") {
                 let key = metric.to_metric_key();
-                self.write_metric(&key, &vec![device], f64::from(found))
+                self.write_metric(&key, &vec![device], found)
                     .await;
             } else {
                 log::error!(
-                    "{}: failed updating tracked device metric {}",
+                    "{}: failed updating tracked device '{}' metric",
                     self.addr,
                     device
                 );
@@ -283,4 +283,12 @@ impl PADMClient {
             }
         }
     }
+}
+
+fn sanitize_label(label: String) -> String {
+    label.to_lowercase()
+        .replace([' ', '-', '(', ')'], "_")
+        .replace("__", "_")
+        .trim_end_matches("_")
+        .to_string()
 }
