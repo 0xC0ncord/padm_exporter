@@ -61,7 +61,7 @@ async fn metrics_handler(
 
     let client = clients
         .get(&target)
-        .context("Requested target {} not found.")?;
+        .context(format!("requested target {target} not found."))?;
 
     let encoder = TextEncoder::new();
     let mut buffer = Vec::new();
@@ -133,7 +133,7 @@ pub async fn run(config: config::Config) -> Result<()> {
                 )
                 .await
             {
-                log::error!("Error serving connection: {e:?}");
+                log::error!("error serving connection: {e:?}");
             }
         });
     }
