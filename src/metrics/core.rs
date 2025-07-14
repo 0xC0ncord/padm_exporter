@@ -97,7 +97,7 @@ impl PADMMetric {
                 false,
             ),
             PADMMetric::SetPointTemperature => (
-                "set_point_temperature",
+                "set_point_temperature_celsius",
                 "Set point temperature of the device, in degrees Celsius.",
                 vec!["device".into()],
                 false,
@@ -109,19 +109,19 @@ impl PADMMetric {
                 false,
             ),
             PADMMetric::ReturnAirTemperature => (
-                "return_air_temperature",
+                "return_air_temperature_celsius",
                 "Return air temperature currently reported by the device, in degrees Celsius.",
                 vec!["device".into()],
                 false,
             ),
             PADMMetric::RemoteSetPointTemperature => (
-                "remote_set_point_temperature",
+                "remote_set_point_temperature_celsius",
                 "Set point temperature of the remote sensor of the device, in degrees Celsius.",
                 vec!["device".into()],
                 false,
             ),
             PADMMetric::Temperature => (
-                "temperature",
+                "temperature_celsius",
                 "Ambient temperature currently reported by the device, in degrees Celsius.",
                 vec!["device".into()],
                 false,
@@ -152,13 +152,13 @@ impl PADMMetric {
             ),
             PADMMetric::TempLowCritThreshold => (
                 "temp_low_crit_threshold",
-                "Critically high temperature threshold configured on the device.",
+                "Critically low temperature threshold configured on the device.",
                 vec!["device".into()],
                 false,
             ),
             PADMMetric::TempHighCritThreshold => (
                 "temp_high_crit_threshold",
-                "Critically low temperature threshold configured on the device.",
+                "Critically high temperature threshold configured on the device.",
                 vec!["device".into()],
                 false,
             ),
