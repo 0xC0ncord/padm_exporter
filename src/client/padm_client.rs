@@ -69,6 +69,8 @@ impl PADMClient {
     }
     /// Log into the target and retrieve authentication data
     async fn authenticate(&self) -> Result<()> {
+        log::debug!("{}: authenticating with target", self.addr);
+
         let request_url = self.url.to_string() + "/api/oauth/token?grant_type=password";
         let params = [("username", &self.username), ("password", &self.password)];
 
@@ -76,15 +78,16 @@ impl PADMClient {
 
         match response {
             Err(e) => {
-                error!("Authentication failed on endpoint {}: {}", self.url, e);
+                error!("{}: authentication failed: {}", self.addr, e);
                 Err(anyhow!(e))
             }
             Ok(r) => match r.json().await {
                 Err(e) => {
-                    error!("Malformed auth response from endpoint {}: {}", self.url, e);
+                    error!("{}: malformed auth response: {}", self.addr, e);
                     Err(anyhow!(e))
                 }
                 Ok(j) => {
+                    log::debug!("{}: authentication successful", self.addr);
                     let mut auth_data = self.auth_data.write().await;
                     *auth_data = j;
                     Ok(())
@@ -93,6 +96,7 @@ impl PADMClient {
         }
     }
     async fn raw_get(&self, url: &str) -> Result<reqwest::Response> {
+        log::debug!("{}: raw get to url {}", self.addr, url);
         self.client
             .get(url)
             .header(
@@ -139,13 +143,17 @@ impl PADMClient {
             .json()
             .await
             .context("Failed to deserialize JSON")?;
+
+        log::debug!("{}: got ApiResponse:\n{:?}", self.addr, response_data);
         *api_data = Some(response_data);
+
         Ok(())
     }
     /// Update metrics from the ApiResponse
     async fn update_metrics(&self) {
-        let guard = self.api_response.read().await;
         let do_notify = !self.is_ready().await;
+
+        let guard = self.api_response.read().await;
         let response_data = guard.as_ref().unwrap();
         for var in response_data.data.iter() {
             let attr = var.attributes.clone();
@@ -187,6 +195,8 @@ impl PADMClient {
                     } else {
                         vec![&*attr.device_name]
                     };
+
+                    log::debug!("{}: updating metric {} with value {}", self.addr, key.name, raw_value);
                     if let Err(e) =
                         self.registry
                             .write()
@@ -196,6 +206,8 @@ impl PADMClient {
                         log::error!("Failed to update or register metric {}: {}", key.name, e);
                     }
                 }
+            } else {
+                log::debug!("{}: variable {} unmapped", self.addr, var.attributes.label);
             }
         }
 
