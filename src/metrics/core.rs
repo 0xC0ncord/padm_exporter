@@ -33,6 +33,9 @@ pub enum PADMMetric {
     ContactOutputCount,
     TempLowCritThreshold,
     TempHighCritThreshold,
+    CoolingMode,
+    FanSpeedSetting,
+    FaultConditions,
 }
 impl PADMMetric {
     pub fn to_metric_key(&self) -> MetricKey {
@@ -157,6 +160,24 @@ impl PADMMetric {
                 vec!["device".into()],
                 false,
             ),
+            PADMMetric::CoolingMode => (
+                "cooling_mode",
+                "Whether the device's cooling is enabled.",
+                vec!["device".into()],
+                false,
+            ),
+            PADMMetric::FanSpeedSetting => (
+                "fan_speed_setting",
+                "The speed setting of the device's fan(s).",
+                vec!["device".into(), "mode".into()],
+                true,
+            ),
+            PADMMetric::FaultConditions => (
+                "fault_conditions",
+                "Whether the device is reporting any faults.",
+                vec!["device".into()],
+                false,
+            ),
         };
 
         MetricKey {
@@ -189,6 +210,9 @@ impl PADMMetric {
             "Contact Output Count" => ContactOutputCount,
             "Temperature (C) Low Critical Threshold" => TempLowCritThreshold,
             "Temperature (C) High Critical Threshold" => TempHighCritThreshold,
+            "Cooling Mode" => CoolingMode,
+            "Fan Speed Setting" => FanSpeedSetting,
+            "Fault Conditions" => FaultConditions,
             _ => return None,
         })
     }
