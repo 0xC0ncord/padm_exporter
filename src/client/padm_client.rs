@@ -1,5 +1,4 @@
 use anyhow::{Context, Result, anyhow};
-use log::error;
 use std::thread::Thread;
 use std::time::Duration;
 use tokio::sync::{Notify, RwLock};
@@ -85,26 +84,21 @@ impl PADMClient {
         let request_url = self.url.to_string() + "/api/oauth/token?grant_type=password";
         let params = [("username", &self.username), ("password", &self.password)];
 
-        let response = self.client.post(&request_url).form(&params).send().await;
+        let response_json = self
+            .client
+            .post(&request_url)
+            .form(&params)
+            .send()
+            .await
+            .context("authentication failed")?
+            .json()
+            .await
+            .context("malformed auth response")?;
 
-        match response {
-            Err(e) => {
-                error!("{}: authentication failed: {}", self.addr, e);
-                Err(anyhow!(e))
-            }
-            Ok(r) => match r.json().await {
-                Err(e) => {
-                    error!("{}: malformed auth response: {}", self.addr, e);
-                    Err(anyhow!(e))
-                }
-                Ok(j) => {
-                    log::debug!("{}: authentication successful", self.addr);
-                    let mut auth_data = self.auth_data.write().await;
-                    *auth_data = j;
-                    Ok(())
-                }
-            },
-        }
+        log::debug!("{}: authentication successful", self.addr);
+        let mut auth_data = self.auth_data.write().await;
+        *auth_data = response_json;
+        Ok(())
     }
     async fn raw_get(&self, url: &str) -> Result<reqwest::Response> {
         log::debug!("{}: raw get to url {}", self.addr, url);
@@ -124,7 +118,9 @@ impl PADMClient {
 
         // Authenticate if never authenticated before
         if self.auth_data.read().await.is_empty() {
-            self.authenticate().await?;
+            self.authenticate()
+                .await
+                .with_context(|| format!("{}: failed to send web request", self.addr))?;
         }
 
         let response = self.raw_get(&url).await;
