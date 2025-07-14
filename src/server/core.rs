@@ -94,6 +94,7 @@ pub async fn run(config: config::Config) -> Result<()> {
             target.interval(),
             target.username(),
             target.password(),
+            target.tracked_devices().clone(),
         );
         let client_arc = Arc::new(client);
         clients.insert(target.host().to_string(), client_arc.clone());

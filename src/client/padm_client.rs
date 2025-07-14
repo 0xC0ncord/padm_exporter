@@ -5,7 +5,7 @@ use std::time::Duration;
 use tokio::sync::{Notify, RwLock};
 
 use crate::client::auth::AuthData;
-use crate::metrics::{MetricsRegistry, PADMMetric};
+use crate::metrics::{MetricKey, MetricsRegistry, PADMMetric};
 use crate::target::ApiResponse;
 
 /*
@@ -18,6 +18,7 @@ pub struct PADMClient {
     interval: u64,
     username: String,
     password: String,
+    tracked_devices: Vec<String>,
     auth_data: RwLock<AuthData>,
     api_response: RwLock<Option<ApiResponse>>,
     registry: RwLock<MetricsRegistry>,
@@ -32,6 +33,7 @@ impl PADMClient {
         interval: u64,
         username: &str,
         password: &str,
+        tracked_devices: Vec<String>,
     ) -> PADMClient {
         let mut client_builder = reqwest::Client::builder();
         // Disable SSL verification if asked
@@ -48,6 +50,7 @@ impl PADMClient {
             url: url.to_string(),
             username: username.to_string(),
             password: password.to_string(),
+            tracked_devices,
             interval,
             auth_data: RwLock::new(AuthData::new()),
             api_response: RwLock::new(None),
@@ -149,10 +152,21 @@ impl PADMClient {
 
         Ok(())
     }
+    async fn write_metric(&self, key: &MetricKey, label_refs: &Vec<&str>, raw_value: f64) {
+        if let Err(e) =
+            self.registry
+                .write()
+                .await
+                .update_metric(key, label_refs, raw_value)
+        {
+            log::error!("Failed to update or register metric {}: {}", key.name, e);
+        }
+    }
     /// Update metrics from the ApiResponse
     async fn update_metrics(&self) {
         let do_notify = !self.is_ready().await;
 
+        // Update metrics from target
         let guard = self.api_response.read().await;
         let response_data = guard.as_ref().unwrap();
         for var in response_data.data.iter() {
@@ -198,17 +212,24 @@ impl PADMClient {
                     };
 
                     log::debug!("{}: updating metric {} with value {}", self.addr, key.name, raw_value);
-                    if let Err(e) =
-                        self.registry
-                            .write()
-                            .await
-                            .update_metric(&key, &label_refs, raw_value)
-                    {
-                        log::error!("Failed to update or register metric {}: {}", key.name, e);
-                    }
+                    self.write_metric(&key, &label_refs, raw_value).await;
                 }
             } else {
                 log::debug!("{}: variable {} unmapped", self.addr, var.attributes.label);
+            }
+        }
+
+        // Update tracked device status metrics
+        for device in self.tracked_devices.iter() {
+            let found = response_data.data.iter().any(|var| var.attributes.device_name == *device);
+
+            log::debug!("{}: updating tracked device metric {} with value {}", self.addr, device, found);
+
+            if let Some(metric) = PADMMetric::from_label("Device Up") {
+                let key = metric.to_metric_key();
+                self.write_metric(&key, &vec![device], f64::from(found)).await;
+            } else {
+                log::error!("{}: failed updating tracked device metric {}", self.addr, device);
             }
         }
 

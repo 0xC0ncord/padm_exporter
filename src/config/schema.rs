@@ -38,6 +38,7 @@ pub struct Target {
     interval: Option<u64>,
     username: String,
     password: String,
+    track_devices: Vec<String>,
 }
 impl Target {
     pub fn host(&self) -> &str {
@@ -69,5 +70,8 @@ impl Target {
     }
     pub fn password(&self) -> &str {
         &self.password
+    }
+    pub fn tracked_devices(&self) -> &Vec<String> {
+        &self.track_devices
     }
 }

@@ -36,6 +36,8 @@ pub enum PADMMetric {
     CoolingMode,
     FanSpeedSetting,
     FaultConditions,
+
+    DeviceUp,
 }
 impl PADMMetric {
     pub fn to_metric_key(&self) -> MetricKey {
@@ -178,6 +180,13 @@ impl PADMMetric {
                 vec!["device".into()],
                 false,
             ),
+
+            PADMMetric::DeviceUp => (
+                "device_up",
+                "Whether the device is present and enabled.",
+                vec!["device".into()],
+                false,
+            ),
         };
 
         MetricKey {
@@ -190,6 +199,7 @@ impl PADMMetric {
     pub fn from_label(label: &str) -> Option<Self> {
         use PADMMetric::*;
         Some(match label {
+            // Known PADM metrics.
             "Firmware Version" => FirmwareVersion,
             "Operating Mode" => OperatingMode,
             "LCD Display Units (Cooling)" => LcdDisplayUnits,
@@ -213,6 +223,11 @@ impl PADMMetric {
             "Cooling Mode" => CoolingMode,
             "Fan Speed Setting" => FanSpeedSetting,
             "Fault Conditions" => FaultConditions,
+
+            // Internal metrics.
+            "Device Up" => DeviceUp,
+
+            // Everything else.
             _ => return None,
         })
     }
