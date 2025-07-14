@@ -1,10 +1,10 @@
-use anyhow::Result;
-use std::fs;
+use anyhow::{Context, Result};
 
 use crate::config::Config;
 
 pub fn load_from_file(file_path: &str) -> Result<Config> {
+    let contents = std::fs::read_to_string(file_path).context("error reading config file")?;
     let config: Config =
-        toml::from_str(&fs::read_to_string(file_path)?).expect("Failed parsing toml config");
+        serde_yml::from_str(&contents).context("yaml parsing failed")?;
     Ok(config)
 }

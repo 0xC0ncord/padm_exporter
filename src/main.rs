@@ -19,7 +19,7 @@ struct Args {
 async fn main() -> Result<()> {
     let args = Args::parse();
 
-    let config = config::load_from_file(&args.config)?;
+    let config = config::load_from_file(&args.config).expect("failed to load config file");
 
     unsafe {
         std::env::set_var(
