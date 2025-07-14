@@ -1,0 +1,32 @@
+# IP or host the exporter binds to.
+ip: "0.0.0.0"
+# Port the exporter binds to.
+port: 8000
+
+targets:
+    # IP or hostname of the target.
+  - host: 10.0.0.1
+    # Port of the target web interface.
+    port: 443
+    # URL scheme when probing the target.
+    # Optional, defaults to 'https'.
+    scheme: https
+    # Ignore TLS errors.
+    # Optional, defaults to false.
+    tls_insecure: true
+    # How often in seconds to probe the target.
+    # Can be set to 0 meaning probe the target on each request.
+    # Optional, defaults to 60.
+    interval: 60
+    # Username when accessing the target web interface.
+    username: "localadmin"
+    # Password when accessing the target web interface.
+    password: "password"
+    # List of devices this target has attached.
+    # Each named device creates an additional "device_up" metric reporting
+    # whether the device is visible or not.
+    # Optional, defaults to [].
+    track_devices:
+      - AC_1
+      - AC_2
+      - AC_1_External_Sensor
