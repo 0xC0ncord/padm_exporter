@@ -7,7 +7,7 @@ edition = "2024"
 anyhow = "1.0.x"
 async-std = "1.13.x"
 clap = { version = "4.5.x", features = ["derive"] }
-env_logger = "0.10.x"
+env_logger = "0.11.x"
 hyper = { version = "1.6.0", features = ["full"] }
 hyper-util = { version = "0.1", features = ["full"] }
 http-body-util = "0.1"
