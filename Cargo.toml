@@ -17,7 +17,7 @@ reqwest = { version = "0.12.x", features = ["blocking", "json"] }
 serde = { version = "1.0.x", features = ["derive"] }
 serde_json = "1.0.x"
 serde_yml = "0.0.12"
-tokio = { version = "1.28.x", features = ["full"] }
+tokio = { version = "1.46.x", features = ["full"] }
 url = "2.5.4"
 
 [target.'cfg(target_env = "musl")'.dependencies]
