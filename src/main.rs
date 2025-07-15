@@ -11,7 +11,7 @@ mod target;
 #[command(version, about)]
 struct Args {
     /// Path to the config file
-    #[arg(short, long)]
+    #[arg(short, long, env = "CONFIG_FILE", default_value = "config.yaml")]
     config: String,
 }
 
@@ -19,6 +19,7 @@ struct Args {
 async fn main() -> Result<()> {
     let args = Args::parse();
 
+    println!("Reading configuration from {}", &args.config);
     let config = config::load_from_file(&args.config).expect("failed to load config file");
 
     unsafe {
