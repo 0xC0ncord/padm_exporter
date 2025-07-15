@@ -99,7 +99,7 @@ pub async fn run(config: config::Config) -> Result<()> {
             target.interval(),
             target.username(),
             target.password(),
-            target.tracked_devices().clone(),
+            target.tracked_devices().clone().unwrap_or_default(),
         );
         log::debug!("Creating client for {}", target.addr());
 

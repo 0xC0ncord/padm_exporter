@@ -2,14 +2,14 @@ use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
-    ip: String,
+    ip: Option<String>,
     port: Option<u16>,
     log_level: Option<String>,
     targets: Vec<Target>,
 }
 impl Config {
     pub fn ip(&self) -> &str {
-        self.ip.as_str()
+        self.ip.as_deref().unwrap_or("0.0.0.0")
     }
     pub fn port(&self) -> u16 {
         self.port.unwrap_or(8080)
@@ -38,7 +38,7 @@ pub struct Target {
     interval: Option<u64>,
     username: String,
     password: String,
-    track_devices: Vec<String>,
+    track_devices: Option<Vec<String>>,
 }
 impl Target {
     pub fn host(&self) -> &str {
@@ -71,7 +71,7 @@ impl Target {
     pub fn password(&self) -> &str {
         &self.password
     }
-    pub fn tracked_devices(&self) -> &Vec<String> {
+    pub fn tracked_devices(&self) -> &Option<Vec<String>> {
         &self.track_devices
     }
 }
