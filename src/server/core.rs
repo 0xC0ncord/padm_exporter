@@ -1,9 +1,6 @@
 use anyhow::{Context, Result};
-use http_body_util::{BodyExt, combinators::BoxBody};
-use http_body_util::{Empty, Full};
-use hyper::body::Bytes;
-use hyper::server::conn::http1;
-use hyper::{Method, Request, Response, StatusCode};
+use http_body_util::{BodyExt, Empty, Full, combinators::BoxBody};
+use hyper::{Method, Request, Response, StatusCode, body::Bytes, header, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use prometheus::{Encoder, TextEncoder};
 use std::collections::HashMap;
@@ -81,7 +78,14 @@ async fn metrics_handler(
     encoder.encode(&metrics, &mut buffer).unwrap();
 
     // Send it
-    Ok(Response::new(full(Bytes::from(buffer)).boxed()))
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(
+            header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )
+        .body(full(Bytes::from(buffer)))
+        .unwrap())
 }
 
 pub async fn run(config: config::Config) -> Result<()> {
