@@ -15,10 +15,7 @@ impl Config {
         self.port.unwrap_or(8080)
     }
     pub fn log_level(&self) -> &str {
-        match &self.log_level {
-            Some(s) => s,
-            None => "info",
-        }
+        self.log_level.as_deref().unwrap_or("info")
     }
     pub fn targets(&self) -> &Vec<Target> {
         &self.targets
