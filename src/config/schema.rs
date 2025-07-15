@@ -12,7 +12,7 @@ impl Config {
         self.ip.as_str()
     }
     pub fn port(&self) -> u16 {
-        self.port.unwrap_or(8000)
+        self.port.unwrap_or(8080)
     }
     pub fn log_level(&self) -> &str {
         match &self.log_level {

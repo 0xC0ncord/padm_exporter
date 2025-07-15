@@ -1,7 +1,7 @@
 # IP or host the exporter binds to.
 ip: "0.0.0.0"
 # Port the exporter binds to.
-port: 8000
+port: 8080
 
 targets:
     # IP or hostname of the target.
