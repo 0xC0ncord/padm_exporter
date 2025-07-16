@@ -9,7 +9,7 @@ pub struct Config {
 }
 impl Config {
     pub fn ip(&self) -> &str {
-        self.ip.as_deref().unwrap_or("0.0.0.0")
+        self.ip.as_deref().unwrap_or("::")
     }
     pub fn port(&self) -> u16 {
         self.port.unwrap_or(8080)
